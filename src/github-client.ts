@@ -1,0 +1,214 @@
+import * as core from '@actions/core';
+import { Octokit } from '@octokit/core';
+import { OctokitOptions } from '@octokit/core/dist-types/types';
+import { IInputs } from './inputs';
+import { ICreateOrUpdatePullRequestBranchResult } from './service';
+import { restEndpointMethods } from '@octokit/plugin-rest-endpoint-methods';
+import { Api } from '@octokit/plugin-rest-endpoint-methods/dist-types/types';
+import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+
+const ERROR_PR_REVIEW_TOKEN_SCOPE: string =
+  'Validation Failed: "Could not resolve to a node with the global id of';
+
+export interface Repository {
+  owner: string;
+  repo: string;
+}
+
+export interface Pull {
+  number: number;
+  html_url: string;
+  created: boolean;
+}
+
+export interface IGithubClient {
+  preparePullRequest(
+    inputs: IInputs,
+    result: ICreateOrUpdatePullRequestBranchResult,
+  ): Promise<Pull>;
+
+  createOrUpdatePullRequest(
+    inputs: IInputs,
+    result: ICreateOrUpdatePullRequestBranchResult,
+  ): Promise<Pull>;
+
+  updateIssues(inputs: IInputs, pull: Pull): Promise<void>;
+
+  mergePullRequest(): Promise<void>;
+}
+
+export function createGithubClient(githubToken: string): IGithubClient {
+  return new GithubClient(githubToken);
+}
+
+class GithubClient implements IGithubClient {
+  private readonly workflowUtils: IWorkflowUtils;
+  private readonly octokit: InstanceType<typeof Octokit>;
+  private readonly api: Api;
+
+  constructor(githubToken: string) {
+    this.workflowUtils = createWorkflowUtils();
+
+    const options: OctokitOptions = {};
+    if (githubToken) {
+      options.auth = `${githubToken}`;
+    }
+    options.baseUrl = process.env['GITHUB_API_URL'] || 'https://api.github.com';
+    this.octokit = new Octokit(options);
+    this.api = restEndpointMethods(this.octokit);
+  }
+
+  async preparePullRequest(
+    inputs: IInputs,
+    result: ICreateOrUpdatePullRequestBranchResult,
+  ): Promise<Pull> {
+    const pull: Pull = await this.createOrUpdatePullRequest(inputs, result);
+    await this.updateIssues(inputs, pull);
+    return pull;
+  }
+
+  async createOrUpdatePullRequest(
+    inputs: IInputs,
+    result: ICreateOrUpdatePullRequestBranchResult,
+  ): Promise<Pull> {
+    const repoOwner: string = inputs.REPO_OWNER;
+    const repoName: string = inputs.REPO_NAME;
+    const repoBranch: string = `${repoOwner}:${result.targetBranch}`;
+    const headBranchFull: string = `${repoOwner}/${repoName}:${repoBranch}`;
+
+    try {
+      core.info(`Trying to create the Pull Request`);
+      const { data: pull } = await this.api.rest.pulls.create({
+        ...({ owner: repoOwner, repo: repoName } as Repository),
+        title: inputs.PR_TITLE,
+        body: inputs.PR_BODY,
+        draft: inputs.DRAFT,
+        head: repoBranch,
+        head_repo: repoName,
+        base: result.targetBranch,
+      });
+      return {
+        number: pull.number,
+        html_url: pull.html_url,
+        created: true,
+      } as Pull;
+    } catch (e: unknown) {
+      if (
+        this.workflowUtils
+          .getErrorMessage(e)
+          .includes(`A pull request already exists for`)
+      ) {
+        core.info(`A pull request already exists for ${headBranchFull}`);
+      } else {
+        throw e;
+      }
+    }
+
+    core.info(`Fetching existing pull request`);
+    const { data: pulls } = await this.api.rest.pulls.list({
+      ...({ owner: repoOwner, repo: repoName } as Repository),
+      state: 'open',
+      head: headBranchFull,
+      base: result.targetBranch,
+    });
+    core.info(`Attempting update of pull request`);
+    const { data: pull } = await this.api.rest.pulls.update({
+      ...({ owner: repoOwner, repo: repoName } as Repository),
+      pull_number: pulls[0].number,
+      title: inputs.PR_TITLE,
+      body: inputs.PR_BODY,
+    });
+    core.info(
+      `Updated pull request #${pull.number} (${repoBranch} => ${result.targetBranch})`,
+    );
+    return {
+      number: pull.number,
+      html_url: pull.html_url,
+      created: false,
+    };
+  }
+
+  async updateIssues(inputs: IInputs, pull: Pull): Promise<void> {
+    const repoOwner: string = inputs.REPO_OWNER;
+    const repoName: string = inputs.REPO_NAME;
+
+    // Apply milestone
+    if (inputs.MILESTONE) {
+      core.info(`Applying milestone '${inputs.MILESTONE}'`);
+      await this.api.rest.issues.update({
+        ...({ owner: repoOwner, repo: repoName } as Repository),
+        issue_number: pull.number,
+        milestone: inputs.MILESTONE,
+      });
+    }
+
+    // Apply labels
+    if (inputs.LABELS && inputs.LABELS.length > 0) {
+      core.info(`Applying labels '${inputs.LABELS}'`);
+      await this.api.rest.issues.addLabels({
+        ...({ owner: repoOwner, repo: repoName } as Repository),
+        issue_number: pull.number,
+        labels: inputs.LABELS,
+      });
+    }
+
+    // Apply assignees
+    if (inputs.ASSIGNEES && inputs.ASSIGNEES.length > 0) {
+      core.info(`Applying assignees '${inputs.ASSIGNEES}'`);
+      await this.api.rest.issues.addAssignees({
+        ...({ owner: repoOwner, repo: repoName } as Repository),
+        issue_number: pull.number,
+        assignees: inputs.ASSIGNEES,
+      });
+    }
+
+    // Request reviewers and team reviewers
+    const requestReviewersParams: {
+      reviewers: string[];
+      team_reviewers: string[];
+    } = { reviewers: [], team_reviewers: [] };
+    if (inputs.REVIEWERS && inputs.REVIEWERS.length > 0) {
+      requestReviewersParams['reviewers'] = inputs.REVIEWERS;
+      core.info(`Requesting reviewers '${inputs.REVIEWERS}'`);
+    }
+    if (inputs.REAM_REVIEWERS && inputs.REAM_REVIEWERS.length > 0) {
+      const teams: string[] = this.stripOrgPrefixFromTeams(
+        inputs.REAM_REVIEWERS,
+      );
+      requestReviewersParams['team_reviewers'] = teams;
+      core.info(`Requesting team reviewers '${teams}'`);
+    }
+    if (Object.keys(requestReviewersParams).length > 0) {
+      try {
+        await this.api.rest.pulls.requestReviewers({
+          ...({ owner: repoOwner, repo: repoName } as Repository),
+          pull_number: pull.number,
+          ...requestReviewersParams,
+        });
+      } catch (e) {
+        if (
+          this.workflowUtils
+            .getErrorMessage(e)
+            .includes(ERROR_PR_REVIEW_TOKEN_SCOPE)
+        ) {
+          core.error(
+            `Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required.`,
+          );
+        }
+        throw e;
+      }
+    }
+  }
+
+  stripOrgPrefixFromTeams(teams: string[]): string[] {
+    return teams.map((team: string) => {
+      const slashIndex: number = team.lastIndexOf('/');
+      if (slashIndex > 0) {
+        return team.substring(slashIndex + 1);
+      }
+      return team;
+    });
+  }
+
+  async mergePullRequest(): Promise<void> {}
+}

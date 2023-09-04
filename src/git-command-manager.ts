@@ -1,0 +1,446 @@
+import * as core from '@actions/core';
+import * as io from '@actions/io';
+import * as exec from '@actions/exec';
+import { GitExecOutput } from './git-exec-output';
+import { ErrorMessages, InfoMessages } from './message';
+import path from 'path';
+import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+
+const tagsRefSpec: string = '+refs/tags/*:refs/tags/*';
+
+export enum WorkingBaseType {
+  Branch = 'branch',
+  Commit = 'commit',
+}
+
+export interface IRemoteDetail {
+  hostname: string;
+  protocol: string;
+  repository: string;
+}
+
+export interface IWorkingBaseAndType {
+  workingBase: string;
+  workingBaseType: WorkingBaseType;
+}
+
+export interface IGitCommandManager {
+  getRepoRemoteUrl(): Promise<string>;
+
+  getRemoteDetail(remoteUrl: string): IRemoteDetail;
+
+  getWorkingBaseAndType(): Promise<IWorkingBaseAndType>;
+
+  stashPush(options?: string[]): Promise<boolean>;
+
+  stashPop(options?: string[]): Promise<void>;
+
+  revParse(ref: string, options?: string[]): Promise<string>;
+
+  checkout(ref: string, startPoint?: string): Promise<void>;
+
+  fetch(remote: string, branch: string): Promise<boolean>;
+
+  fetchRemote(
+    refSpec: string[],
+    remoteName?: string,
+    options?: string[],
+  ): Promise<void>;
+
+  isAhead(branch1: string, branch2: string): Promise<boolean>;
+
+  commitsAhead(branch1: string, branch2: string): Promise<number>;
+
+  isEven(branch1: string, branch2: string): Promise<boolean>;
+
+  pull(options?: string[]): Promise<void>;
+
+  push(options?: string[]): Promise<void>;
+
+  deleteBranch(branchName: string, options?: string[]): Promise<void>;
+
+  status(options?: string[]): Promise<string>;
+
+  hasDiff(options?: string[]): Promise<boolean>;
+
+  config(
+    configKey: string,
+    configValue: string,
+    globalConfig?: boolean,
+    add?: boolean,
+  ): Promise<void>;
+
+  configExists(configKey: string, globalConfig?: boolean): Promise<boolean>;
+
+  unsetConfig(configKey: string, globalConfig?: boolean): Promise<boolean>;
+
+  getWorkingDirectory(): string;
+}
+
+export async function createGitCommandManager(
+  workingDirectory: string,
+): Promise<IGitCommandManager> {
+  return await GitCommandManager.create(workingDirectory);
+}
+
+export class GitCommandManager implements IGitCommandManager {
+  private readonly workflowUtils: IWorkflowUtils;
+  private gitPath: string = '';
+  private workingDirectory: string = '';
+
+  private constructor() {
+    this.workflowUtils = createWorkflowUtils();
+  }
+
+  static async create(workingDirectory: string): Promise<GitCommandManager> {
+    const gitCommandManager: GitCommandManager = new GitCommandManager();
+    await gitCommandManager.init(workingDirectory);
+    return gitCommandManager;
+  }
+
+  async getRepoRemoteUrl(): Promise<string> {
+    const result: GitExecOutput = await this.execGit(
+      ['config', '--get', 'remote.origin.url'],
+      true,
+      true,
+    );
+    return result.getStdout().trim();
+  }
+
+  getRemoteDetail(remoteUrl: string): IRemoteDetail {
+    const githubUrl: string =
+      process.env['GITHUB_SERVER_URL'] || 'https://github.com';
+    return this.githubHttpsUrlValidator(githubUrl);
+  }
+
+  async getWorkingBaseAndType(): Promise<IWorkingBaseAndType> {
+    const symbolicRefResult: GitExecOutput = await this.execGit(
+      ['symbolic-ref', 'HEAD', '--short'],
+      true,
+    );
+    if (symbolicRefResult.getExitCode() == 0) {
+      // ref
+      return {
+        workingBase: symbolicRefResult.getStdout(),
+        workingBaseType: WorkingBaseType.Branch,
+      } as IWorkingBaseAndType;
+    } else {
+      // detached HEAD
+      const headSha = await this.revParse('HEAD');
+      return {
+        workingBase: headSha,
+        workingBaseType: WorkingBaseType.Commit,
+      } as IWorkingBaseAndType;
+    }
+  }
+
+  async stashPush(options?: string[]): Promise<boolean> {
+    const args: string[] = ['stash', 'push'];
+    if (options) {
+      args.push(...options);
+    }
+    const output = await this.execGit(args);
+    return output.getStdout().trim() !== 'No local changes to save';
+  }
+
+  async stashPop(options?: string[]): Promise<void> {
+    const args: string[] = ['stash', 'pop'];
+    if (options) {
+      args.push(...options);
+    }
+    await this.execGit(args);
+  }
+
+  private async revList(
+    commitExpression: string[],
+    options?: string[],
+  ): Promise<string> {
+    const args: string[] = ['rev-list'];
+    if (options) {
+      args.push(...options);
+    }
+    args.push(...commitExpression);
+    const output: GitExecOutput = await this.execGit(args);
+    return output.getStdout().trim();
+  }
+
+  async revParse(ref: string, options?: string[]): Promise<string> {
+    const args: string[] = ['rev-parse'];
+    if (options) {
+      args.push(...options);
+    }
+    args.push(ref);
+    const output: GitExecOutput = await this.execGit(args);
+    return output.getStdout();
+  }
+
+  async checkout(ref: string, startPoint?: string): Promise<void> {
+    const args: string[] = ['checkout', '--progress'];
+    if (startPoint) {
+      args.push('-B', ref, startPoint);
+    } else {
+      args.push(ref);
+    }
+    // https://github.com/git/git/commit/a047fafc7866cc4087201e284dc1f53e8f9a32d5
+    args.push('--');
+    await this.execGit(args);
+  }
+
+  async fetch(remote: string, branch: string): Promise<boolean> {
+    try {
+      await this.fetchRemote(
+        [`${branch}:refs/remotes/${remote}/${branch}`],
+        remote,
+        ['--force'],
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchRemote(
+    refSpec: string[],
+    remoteName?: string,
+    options?: string[],
+  ): Promise<void> {
+    const args: string[] = ['-c', 'protocol.version=2', 'fetch'];
+    if (!refSpec.some((x) => x === tagsRefSpec)) {
+      args.push('--no-tags');
+    }
+
+    args.push('--progress', '--no-recurse-submodules');
+    if (
+      this.workflowUtils.fileExistsSync(
+        path.join(this.workingDirectory, '.git', 'shallow'),
+      )
+    ) {
+      args.push('--unshallow');
+    }
+
+    if (options) {
+      args.push(...options);
+    }
+
+    if (remoteName) {
+      args.push(remoteName);
+    } else {
+      args.push('origin');
+    }
+    for (const arg of refSpec) {
+      args.push(arg);
+    }
+
+    await this.execGit(args);
+  }
+
+  async isAhead(branch1: string, branch2: string): Promise<boolean> {
+    return (await this.commitsAhead(branch1, branch2)) > 0;
+  }
+
+  async commitsAhead(branch1: string, branch2: string): Promise<number> {
+    const result: string = await this.revList(
+      [`${branch1}...${branch2}`],
+      ['--right-only', '--count'],
+    );
+    return Number(result);
+  }
+
+  async isBehind(branch1: string, branch2: string): Promise<boolean> {
+    return (await this.commitsBehind(branch1, branch2)) > 0;
+  }
+
+  async commitsBehind(branch1: string, branch2: string): Promise<number> {
+    const result: string = await this.revList(
+      [`${branch1}...${branch2}`],
+      ['--left-only', '--count'],
+    );
+    return Number(result);
+  }
+
+  async isEven(branch1: string, branch2: string): Promise<boolean> {
+    return (
+      !(await this.isAhead(branch1, branch2)) &&
+      !(await this.isBehind(branch1, branch2))
+    );
+  }
+
+  async pull(options?: string[]): Promise<void> {
+    const args: string[] = ['pull'];
+    if (options) {
+      args.push(...options);
+    }
+    await this.execGit(args);
+  }
+
+  async push(options?: string[]): Promise<void> {
+    const args: string[] = ['push'];
+    if (options) {
+      args.push(...options);
+    }
+    await this.execGit(args);
+  }
+
+  async deleteBranch(branchName: string, options?: string[]): Promise<void> {
+    const args: string[] = ['branch', '--delete'];
+    if (options) {
+      args.push(...options);
+    }
+    args.push(branchName);
+    await this.execGit(args);
+  }
+
+  async status(options?: string[]): Promise<string> {
+    const args: string[] = ['status'];
+    if (options) {
+      args.push(...options);
+    }
+    const output = await this.execGit(args);
+    return output.getStdout().trim();
+  }
+
+  async hasDiff(options?: string[]): Promise<boolean> {
+    const args: string[] = ['diff', '--quiet'];
+    if (options) {
+      args.push(...options);
+    }
+    const output = await this.execGit(args, true);
+    return output.getExitCode() === 1;
+  }
+
+  async config(
+    configKey: string,
+    configValue: string,
+    globalConfig?: boolean,
+    add?: boolean,
+  ): Promise<void> {
+    const args: string[] = ['config', globalConfig ? '--global' : '--local'];
+    if (add) {
+      args.push('--add');
+    }
+    args.push(...[configKey, configValue]);
+    await this.execGit(args);
+  }
+
+  async configExists(
+    configKey: string,
+    globalConfig?: boolean,
+  ): Promise<boolean> {
+    const output = await this.execGit(
+      [
+        'config',
+        globalConfig ? '--global' : '--local',
+        '--name-only',
+        '--get-regexp',
+        configKey,
+      ],
+      true,
+    );
+    return output.getExitCode() === 0;
+  }
+
+  async unsetConfig(
+    configKey: string,
+    globalConfig?: boolean,
+  ): Promise<boolean> {
+    const output: GitExecOutput = await this.execGit(
+      [
+        'config',
+        globalConfig ? '--global' : '--local',
+        '--unset-all',
+        configKey,
+      ],
+      true,
+    );
+    return output.getExitCode() === 0;
+  }
+
+  getWorkingDirectory(): string {
+    return this.workingDirectory;
+  }
+
+  private async init(workingDirectory: string): Promise<void> {
+    core.info(InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
+    this.workingDirectory = workingDirectory;
+    this.gitPath = await io.which('git', true);
+  }
+
+  private async execGit(
+    args: string[],
+    ignoreReturnCode: boolean = false,
+    silent: boolean = false,
+  ): Promise<GitExecOutput> {
+    const output: GitExecOutput = new GitExecOutput();
+
+    const env = this.getProcessEnv();
+
+    const execOptions: exec.ExecOptions = {
+      cwd: this.workingDirectory,
+      env,
+      ignoreReturnCode: ignoreReturnCode,
+      silent: silent,
+      listeners: {
+        stdout: (data: Buffer) => {
+          output.addStdoutLine(data.toString());
+        },
+        stderr: (data: Buffer) => {
+          output.addStderrLine(data.toString());
+        },
+        debug: (data: string) => {
+          output.addDebugLine(data);
+        },
+      },
+    };
+
+    const exitCode: number = await exec.exec(this.gitPath, args, execOptions);
+    output.setExitCode(exitCode);
+
+    return output;
+  }
+
+  private getProcessEnv(): { [key: string]: string } {
+    const env: { [key: string]: string } = {};
+    Object.keys(process.env).forEach((key) => {
+      env[key] = process.env[key]!;
+    });
+    return env;
+  }
+
+  private urlMatcher(url: string): RegExpMatchArray {
+    const pattern: string = '/^https?:\\/\\/(.+)$/i';
+    const matches: RegExpMatchArray | null = url.match(pattern);
+    if (!matches) {
+      throw new Error(ErrorMessages.URL_MATCHER_FAILED);
+    }
+    return matches;
+  }
+
+  private githubHttpsUrlPattern(host: string): RegExp {
+    return new RegExp('^https?://.*@?' + host + '/(.+/.+?)(\\.git)?$', 'i');
+  }
+
+  private githubHttpsUrlMatcher(
+    host: string,
+    url: string,
+  ): RegExpMatchArray | null {
+    const ghHttpsUrlPattern: RegExp = this.githubHttpsUrlPattern(host);
+    return url.match(ghHttpsUrlPattern);
+  }
+
+  private githubHttpsUrlValidator(githubUrl: string): IRemoteDetail {
+    const githubUrlMatchArray: RegExpMatchArray = this.urlMatcher(githubUrl);
+    const host: string = githubUrlMatchArray[1];
+    const githubHttpsMatchArray: RegExpMatchArray | null =
+      this.githubHttpsUrlMatcher(host, githubUrl);
+    if (githubHttpsMatchArray) {
+      return {
+        hostname: host,
+        protocol: 'HTTPS',
+        repository: githubHttpsMatchArray[1],
+      };
+    }
+    throw new Error(
+      `The format of '${githubUrl}' is not a valid GitHub repository URL`,
+    );
+  }
+}
