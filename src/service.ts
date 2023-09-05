@@ -32,6 +32,7 @@ export interface ICreateOrUpdatePullRequestBranchResult {
 
 export interface IService {
   createPullRequest(): Promise<Pull>;
+
   mergePullRequestWithRetries(pullRequest: Pull): Promise<Pull>;
 }
 

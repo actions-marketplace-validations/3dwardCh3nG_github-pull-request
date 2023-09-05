@@ -146,19 +146,6 @@ export class GitCommandManager implements IGitCommandManager {
     await this.execGit(args);
   }
 
-  private async revList(
-    commitExpression: string[],
-    options?: string[]
-  ): Promise<string> {
-    const args: string[] = ['rev-list'];
-    if (options) {
-      args.push(...options);
-    }
-    args.push(...commitExpression);
-    const output: GitExecOutput = await this.execGit(args);
-    return output.getStdout().trim();
-  }
-
   async revParse(ref: string, options?: string[]): Promise<string> {
     const args: string[] = ['rev-parse'];
     if (options) {
@@ -352,6 +339,19 @@ export class GitCommandManager implements IGitCommandManager {
 
   getWorkingDirectory(): string {
     return this.workingDirectory;
+  }
+
+  private async revList(
+    commitExpression: string[],
+    options?: string[]
+  ): Promise<string> {
+    const args: string[] = ['rev-list'];
+    if (options) {
+      args.push(...options);
+    }
+    args.push(...commitExpression);
+    const output: GitExecOutput = await this.execGit(args);
+    return output.getStdout().trim();
   }
 
   private async init(workingDirectory: string): Promise<void> {
