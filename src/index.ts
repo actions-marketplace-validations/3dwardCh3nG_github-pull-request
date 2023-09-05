@@ -23,7 +23,6 @@ export const run = async (): Promise<void> => {
     core.setOutput('pull-request-created', pullRequest.created);
     core.setOutput('pull-request-head-sha', pullRequest.sha);
     core.setOutput('pull-request-merged', pullRequest.merged);
-
     core.endGroup();
   } catch (error) {
     core.setFailed(workflowUtils.getErrorMessage(error));
