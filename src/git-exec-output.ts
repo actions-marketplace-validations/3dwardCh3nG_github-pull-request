@@ -11,35 +11,35 @@ export class GitExecOutput {
     this.debug = [];
   }
 
-  public setExitCode(exitCode: number): void {
+  setExitCode(exitCode: number): void {
     this.exitCode = exitCode;
   }
 
-  public getExitCode(): number {
+  getExitCode(): number {
     return this.exitCode;
   }
 
-  public addStdoutLine(line: string): void {
+  addStdoutLine(line: string): void {
     this.stdout.push(line);
   }
 
-  public getStdout(): string {
+  getStdout(): string {
     return this.stdout.join('\n');
   }
 
-  public addStderrLine(line: string): void {
+  addStderrLine(line: string): void {
     this.stderr.push(line);
   }
 
-  public getStderr(): string {
+  getStderr(): string {
     return this.stderr.join('\n');
   }
 
-  public addDebugLine(line: string): void {
+  addDebugLine(line: string): void {
     this.debug.push(line);
   }
 
-  public getDebug(): string {
+  getDebug(): string {
     return this.debug.join('\n');
   }
 }

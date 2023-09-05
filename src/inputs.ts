@@ -49,31 +49,31 @@ export const prepareInputValues = (): IInputs => {
     core.getInput('team_reviewers', { required: false }).split(','),
     core.getInput('labels', { required: false }).split(','),
     core.getInput('signoff', { required: false }).toLowerCase() === 'true' ||
-      false,
+      false
   );
 };
 
 class Inputs implements IInputs {
-  public GITHUB_TOKEN: string;
-  public REPO_OWNER: string;
-  public REPO_NAME: string;
-  public REMOTE_NAME: string;
-  public SOURCE_BRANCH_NAME: string;
-  public TARGET_BRANCH_NAME: string;
-  public PR_TITLE: string;
-  public PR_BODY: string;
-  public DRAFT: boolean;
-  public REQUIRE_MIDDLE_BRANCH: boolean;
-  public AUTO_MERGE: boolean;
-  public MERGE_METHOD: 'merge' | 'squash' | 'rebase';
-  public MAX_MERGE_RETRIES: number;
-  public MERGE_RETRY_INTERVAL: number;
-  public MILESTONE: number | undefined;
-  public ASSIGNEES: string[] | undefined;
-  public REVIEWERS: string[] | undefined;
-  public REAM_REVIEWERS: string[] | undefined;
-  public LABELS: string[] | undefined;
-  public SIGNOFF: boolean | undefined;
+  GITHUB_TOKEN: string;
+  REPO_OWNER: string;
+  REPO_NAME: string;
+  REMOTE_NAME: string;
+  SOURCE_BRANCH_NAME: string;
+  TARGET_BRANCH_NAME: string;
+  PR_TITLE: string;
+  PR_BODY: string;
+  DRAFT: boolean;
+  REQUIRE_MIDDLE_BRANCH: boolean;
+  AUTO_MERGE: boolean;
+  MERGE_METHOD: 'merge' | 'squash' | 'rebase';
+  MAX_MERGE_RETRIES: number;
+  MERGE_RETRY_INTERVAL: number;
+  MILESTONE: number | undefined;
+  ASSIGNEES: string[] | undefined;
+  REVIEWERS: string[] | undefined;
+  REAM_REVIEWERS: string[] | undefined;
+  LABELS: string[] | undefined;
+  SIGNOFF: boolean | undefined;
 
   constructor(
     githubToken: string,
@@ -95,7 +95,7 @@ class Inputs implements IInputs {
     reviewers: string[],
     teamReviewers: string[],
     labels: string[],
-    signoff: boolean,
+    signoff: boolean
   ) {
     this.GITHUB_TOKEN = githubToken;
     this.REPO_OWNER = repoOwner;

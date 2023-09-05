@@ -15,7 +15,7 @@ export interface IGitAuthHelper {
 
 export function createAuthHelper(
   git: IGitCommandManager,
-  settings?: IGitSourceSettings,
+  settings?: IGitSourceSettings
 ): IGitAuthHelper {
   return new GitAuthHelper(git, settings);
 }
@@ -23,8 +23,8 @@ export function createAuthHelper(
 class GitAuthHelper implements IGitAuthHelper {
   private readonly git: IGitCommandManager;
   private readonly settings: IGitSourceSettings;
-  private tokenConfigKey: string = '';
-  private tokenConfigValue: string = '';
+  private tokenConfigKey = '';
+  private tokenConfigValue = '';
 
   constructor(git: IGitCommandManager, settings?: IGitSourceSettings) {
     this.git = git;
@@ -41,21 +41,21 @@ class GitAuthHelper implements IGitAuthHelper {
     await this.removeToken();
   }
 
-  private init() {
+  private init(): void {
     const serverUrl: URL = this.getServerUrl(
-      this.settings.getGithubServerUrl(),
+      this.settings.getGithubServerUrl()
     );
     this.tokenConfigKey = `http.${serverUrl.origin}/.extraheader`;
     const basicCredential: string = Buffer.from(
       `x-access-token:${this.settings.getAuthToken()}`,
-      'utf8',
+      'utf8'
     ).toString('base64');
     core.setSecret(basicCredential);
     this.tokenConfigValue = `AUTHORIZATION: basic ${basicCredential}`;
   }
 
   private getServerUrl(url?: string): URL {
-    let urlValue: string =
+    const urlValue: string =
       url && url.trim().length > 0
         ? url
         : process.env['GITHUB_SERVER_URL'] || 'https://github.com';
@@ -69,11 +69,11 @@ class GitAuthHelper implements IGitAuthHelper {
 
   private async configureToken(
     configPath?: string,
-    globalConfig?: boolean,
+    globalConfig?: boolean
   ): Promise<void> {
     assert.ok(
       (configPath && globalConfig) || (!configPath && !globalConfig),
-      'Unexpected configureToken parameter combinations',
+      'Unexpected configureToken parameter combinations'
     );
 
     if (!configPath && !globalConfig) {
@@ -86,7 +86,7 @@ class GitAuthHelper implements IGitAuthHelper {
     await this.git.config(
       this.tokenConfigKey,
       Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE,
-      globalConfig,
+      globalConfig
     );
 
     // Replace the placeholder
@@ -106,24 +106,24 @@ class GitAuthHelper implements IGitAuthHelper {
     assert.ok(configPath, ErrorMessages.CONFIG_PATH_IS_NOT_DEFINED);
     let content: string = (await fs.promises.readFile(configPath)).toString();
     const placeholderIndex = content.indexOf(
-      Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE,
+      Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE
     );
     if (
       placeholderIndex < 0 ||
-      placeholderIndex !=
+      placeholderIndex !==
         content.lastIndexOf(Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE)
     ) {
       throw new Error(
-        ErrorMessages.UNABLE_TO_REPLACE_AUTH_PLACEHOLDER + configPath,
+        ErrorMessages.UNABLE_TO_REPLACE_AUTH_PLACEHOLDER + configPath
       );
     }
     assert.ok(
       this.tokenConfigValue,
-      ErrorMessages.TOKEN_CONFIG_VALUE_IS_NOT_DEFINED,
+      ErrorMessages.TOKEN_CONFIG_VALUE_IS_NOT_DEFINED
     );
     content = content.replace(
       Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE,
-      this.tokenConfigValue,
+      this.tokenConfigValue
     );
     await fs.promises.writeFile(configPath, content);
   }

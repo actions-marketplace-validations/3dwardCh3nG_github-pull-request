@@ -15,14 +15,14 @@ export function createSourceSettings(
   repositoryOwner: string,
   repositoryName: string,
   authToken: string,
-  githubServerUrl: string | undefined,
+  githubServerUrl: string | undefined
 ): IGitSourceSettings {
   return new GitSourceSettings(
     repositoryPath,
     repositoryOwner,
     repositoryName,
     authToken,
-    githubServerUrl,
+    githubServerUrl
   );
 }
 
@@ -38,7 +38,7 @@ class GitSourceSettings implements IGitSourceSettings {
     repositoryOwner: string,
     repositoryName: string,
     authToken: string,
-    githubServerUrl: string | undefined,
+    githubServerUrl: string | undefined
   ) {
     this.repositoryPath = repositoryPath;
     this.repositoryOwner = repositoryOwner;
@@ -47,23 +47,23 @@ class GitSourceSettings implements IGitSourceSettings {
     this.githubServerUrl = githubServerUrl;
   }
 
-  public getRepositoryPath(): string {
+  getRepositoryPath(): string {
     return this.repositoryPath;
   }
 
-  public getRepositoryOwner(): string {
+  getRepositoryOwner(): string {
     return this.repositoryOwner;
   }
 
-  public getRepositoryName(): string {
+  getRepositoryName(): string {
     return this.repositoryName;
   }
 
-  public getAuthToken(): string {
+  getAuthToken(): string {
     return this.authToken;
   }
 
-  public getGithubServerUrl(): string | undefined {
+  getGithubServerUrl(): string | undefined {
     return this.githubServerUrl;
   }
 }

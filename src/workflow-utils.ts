@@ -6,7 +6,7 @@ import fs from 'fs';
 export interface IWorkflowUtils {
   getRepoPath(relativePath?: string): string;
 
-  fileExistsSync(path: string): boolean;
+  fileExistsSync(filePath: string): boolean;
 
   getErrorMessage(error: unknown): string;
 }
@@ -31,35 +31,38 @@ class WorkflowUtils implements IWorkflowUtils {
     return repoPath;
   }
 
-  fileExistsSync(path: string): boolean {
-    if (!path) {
-      throw new Error("Arg 'path' must not be empty");
+  fileExistsSync(filePath: string): boolean {
+    if (!filePath) {
+      throw new Error("Arg 'filePath' must not be empty");
     }
 
     let stats: fs.Stats;
     try {
-      stats = fs.statSync(path);
-    } catch (error) {
-      if (this.hasErrorCode(error) && error.code === 'ENOENT') {
+      stats = fs.statSync(filePath);
+    } catch (error: unknown) {
+      if (
+        this.hasErrorCode(error as { code: string }) &&
+        (error as { code: string }).code === 'ENOENT'
+      ) {
         return false;
       }
 
       throw new Error(
         `Encountered an error when checking whether path '${path}' exists: ${this.getErrorMessage(
-          error,
-        )}`,
+          error
+        )}`
       );
     }
 
     return !stats.isDirectory();
   }
 
-  getErrorMessage(error: unknown) {
+  getErrorMessage(error: unknown): string {
     if (error instanceof Error) return error.message;
     return String(error);
   }
 
-  private hasErrorCode(error: any): error is { code: string } {
+  private hasErrorCode(error: { code: string }): error is { code: string } {
     return typeof (error && error.code) === 'string';
   }
 }
