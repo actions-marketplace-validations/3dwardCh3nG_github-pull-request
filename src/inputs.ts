@@ -12,6 +12,9 @@ export interface IInputs {
   DRAFT: boolean;
   REQUIRE_MIDDLE_BRANCH: boolean;
   AUTO_MERGE: boolean;
+  MERGE_METHOD: 'merge' | 'squash' | 'rebase';
+  MAX_MERGE_RETRIES: number;
+  MERGE_RETRY_INTERVAL: number;
   MILESTONE: number | undefined;
   ASSIGNEES: string[] | undefined;
   REVIEWERS: string[] | undefined;
@@ -37,6 +40,9 @@ export const prepareInputValues = (): IInputs => {
       .toLowerCase() === 'true' || false,
     core.getInput('auto_merge', { required: false }).toLowerCase() === 'true' ||
       false,
+    core.getInput('merge_method', { required: false }) || 'merge',
+    core.getInput('max_merge_retries', { required: false }) || '60',
+    core.getInput('merge_retry_interval', { required: false }) || '60',
     core.getInput('milestone', { required: false }),
     core.getInput('assignees', { required: false }).split(','),
     core.getInput('reviewers', { required: false }).split(','),
@@ -59,6 +65,9 @@ class Inputs implements IInputs {
   public DRAFT: boolean;
   public REQUIRE_MIDDLE_BRANCH: boolean;
   public AUTO_MERGE: boolean;
+  public MERGE_METHOD: 'merge' | 'squash' | 'rebase';
+  public MAX_MERGE_RETRIES: number;
+  public MERGE_RETRY_INTERVAL: number;
   public MILESTONE: number | undefined;
   public ASSIGNEES: string[] | undefined;
   public REVIEWERS: string[] | undefined;
@@ -78,6 +87,9 @@ class Inputs implements IInputs {
     draft: boolean,
     requireMiddleBranch: boolean,
     autoMerge: boolean,
+    mergeMethod: string,
+    maxMergeRetries: string,
+    mergeRetryInterval: string,
     milestone: string,
     assignees: string[],
     reviewers: string[],
@@ -96,6 +108,11 @@ class Inputs implements IInputs {
     this.DRAFT = draft;
     this.REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
     this.AUTO_MERGE = autoMerge;
+    this.MERGE_METHOD = ('merge' || 'squash' || 'rebase').match(mergeMethod)
+      ? (mergeMethod as 'merge' | 'squash' | 'rebase')
+      : 'merge';
+    this.MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
+    this.MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
     this.MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
     this.ASSIGNEES =
       assignees.length === 1 && assignees[0] === '' ? assignees : undefined;

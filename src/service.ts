@@ -1,4 +1,4 @@
-import { IInputs, prepareInputValues } from './inputs';
+import { IInputs } from './inputs';
 import { ErrorMessages, InfoMessages, WarningMessages } from './message';
 import * as core from '@actions/core';
 import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
@@ -17,6 +17,11 @@ import {
 import { createGithubClient, IGithubClient, Pull } from './github-client';
 import { v4 as uuidv4 } from 'uuid';
 
+export interface IGitPreparationResponse {
+  git: IGitCommandManager;
+  gitAuthHelper: IGitAuthHelper;
+}
+
 export interface ICreateOrUpdatePullRequestBranchResult {
   action: string;
   sourceBranch: string;
@@ -26,45 +31,37 @@ export interface ICreateOrUpdatePullRequestBranchResult {
 }
 
 export interface IService {
-  createPullRequest(): Promise<void>;
+  createPullRequest(): Promise<Pull>;
+  mergePullRequestWithRetries(pullRequest: Pull): Promise<Pull>;
 }
 
-export function createService(): IService {
-  return new Service();
+export function createService(inputs: IInputs): IService {
+  return new Service(inputs);
 }
 
 class Service implements IService {
   private readonly inputs: IInputs;
   private readonly workflowUtils: IWorkflowUtils;
 
-  constructor() {
-    this.inputs = prepareInputValues();
+  constructor(inputs: IInputs) {
+    this.inputs = inputs;
     this.workflowUtils = createWorkflowUtils();
+    this.inputDataChecks();
   }
 
-  async createPullRequest(): Promise<void> {
-    this.inputDataChecks();
-    const repoPath = this.workflowUtils.getRepoPath();
-    const git: IGitCommandManager = await createGitCommandManager(repoPath);
-    const gitSourceSettings: IGitSourceSettings = createSourceSettings(
-      repoPath,
-      this.inputs.REPO_OWNER,
-      this.inputs.REPO_NAME,
-      this.inputs.SOURCE_BRANCH_NAME,
-      this.inputs.TARGET_BRANCH_NAME,
-    );
-    let gitAuthHelper: IGitAuthHelper = createAuthHelper(
-      git,
-      gitSourceSettings,
-    );
-    const remoteUrl: string = await git.getRepoRemoteUrl();
-    const remoteDetail: IRemoteDetail = git.getRemoteDetail(remoteUrl);
-    core.info(InfoMessages.PR_TARGET_REPO + remoteDetail.repository);
-
-    if ('HTTPS' === remoteDetail.protocol) {
-      core.info(InfoMessages.CONFIG_AUTH_HTTPS);
-      await gitAuthHelper.configureAuth();
-    }
+  async createPullRequest(): Promise<Pull> {
+    const response: IGitPreparationResponse =
+      await this.prepareGitAuthentication();
+    const git: IGitCommandManager = response.git;
+    const gitAuthHelper: IGitAuthHelper = response.gitAuthHelper;
+    let pullRequest: Pull = {
+      number: 0,
+      sha: '',
+      html_url: '',
+      action: '',
+      created: false,
+      merged: false,
+    } as Pull;
 
     try {
       core.startGroup('Create or update the pull request branch');
@@ -79,21 +76,10 @@ class Service implements IService {
         const githubClient: IGithubClient = createGithubClient(
           this.inputs.GITHUB_TOKEN,
         );
-        const pull: Pull = await githubClient.preparePullRequest(
+        pullRequest = await githubClient.preparePullRequest(
           this.inputs,
           result,
         );
-        core.endGroup();
-
-        core.startGroup('Setting outputs');
-        core.setOutput('pull-request-number', pull.number);
-        core.setOutput('pull-request-url', pull.html_url);
-        if (pull.created) {
-          core.setOutput('pull-request-operation', 'created');
-        } else if (result.action == 'updated') {
-          core.setOutput('pull-request-operation', 'updated');
-        }
-        core.setOutput('pull-request-head-sha', result.headSha);
         core.endGroup();
       }
     } catch (error) {
@@ -101,6 +87,61 @@ class Service implements IService {
     } finally {
       await gitAuthHelper.removeAuth();
     }
+    return pullRequest;
+  }
+
+  async mergePullRequestWithRetries(pullRequest: Pull): Promise<Pull> {
+    const response: IGitPreparationResponse =
+      await this.prepareGitAuthentication();
+    const gitAuthHelper: IGitAuthHelper = response.gitAuthHelper;
+    const githubClient: IGithubClient = createGithubClient(
+      this.inputs.GITHUB_TOKEN,
+    );
+    let pr: Pull = {
+      number: pullRequest.number,
+      html_url: pullRequest.html_url,
+      created: pullRequest.created,
+      merged: pullRequest.merged,
+    } as Pull;
+
+    try {
+      pr = await this.mergePullRequest(githubClient, pr);
+    } catch (error) {
+      let retryCount: number = 1;
+      const maxRetries: number = this.inputs.MAX_MERGE_RETRIES;
+      const retryInterval: number = this.inputs.MERGE_RETRY_INTERVAL;
+
+      while (retryCount <= maxRetries) {
+        core.info(`Retrying merge in ${retryInterval} seconds...`);
+        await new Promise((resolve) =>
+          setTimeout(resolve, retryInterval * 1000),
+        );
+        core.info(`Retry ${retryCount} of ${maxRetries}`);
+        pr = await this.mergePullRequest(githubClient, pr);
+        retryCount++;
+      }
+    } finally {
+      await gitAuthHelper.removeAuth();
+    }
+    return pr;
+  }
+
+  async mergePullRequest(
+    githubClient: IGithubClient,
+    pullRequest: Pull,
+  ): Promise<Pull> {
+    try {
+      core.startGroup(`Merging pull request #${pullRequest.number}`);
+      pullRequest = await githubClient.mergePullRequest(
+        pullRequest,
+        this.inputs,
+      );
+      core.endGroup();
+    } catch (error) {
+      core.setFailed(this.workflowUtils.getErrorMessage(error));
+      throw error;
+    }
+    return pullRequest;
   }
 
   private async preparePullRequestBranch(
@@ -229,6 +270,35 @@ class Service implements IService {
       ]);
       core.endGroup();
     }
+  }
+
+  private async prepareGitAuthentication(): Promise<IGitPreparationResponse> {
+    const repoPath: string = this.workflowUtils.getRepoPath();
+    const git: IGitCommandManager = await createGitCommandManager(repoPath);
+    const gitSourceSettings: IGitSourceSettings = createSourceSettings(
+      repoPath,
+      this.inputs.REPO_OWNER,
+      this.inputs.REPO_NAME,
+      this.inputs.SOURCE_BRANCH_NAME,
+      this.inputs.TARGET_BRANCH_NAME,
+    );
+    let gitAuthHelper: IGitAuthHelper = createAuthHelper(
+      git,
+      gitSourceSettings,
+    );
+    const remoteUrl: string = await git.getRepoRemoteUrl();
+    const remoteDetail: IRemoteDetail = git.getRemoteDetail(remoteUrl);
+    core.info(InfoMessages.PR_TARGET_REPO + remoteDetail.repository);
+
+    if ('HTTPS' === remoteDetail.protocol) {
+      core.info(InfoMessages.CONFIG_AUTH_HTTPS);
+      await gitAuthHelper.configureAuth();
+    }
+
+    return {
+      git: git,
+      gitAuthHelper: gitAuthHelper,
+    } as IGitPreparationResponse;
   }
 
   private inputDataChecks(): void {
