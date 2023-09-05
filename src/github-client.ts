@@ -17,8 +17,11 @@ export interface Repository {
 
 export interface Pull {
   number: number;
+  sha?: string;
   html_url: string;
+  action: string;
   created: boolean;
+  merged: boolean;
 }
 
 export interface IGithubClient {
@@ -34,7 +37,7 @@ export interface IGithubClient {
 
   updateIssues(inputs: IInputs, pull: Pull): Promise<void>;
 
-  mergePullRequest(): Promise<void>;
+  mergePullRequest(pullRequest: Pull, inputs: IInputs): Promise<Pull>;
 }
 
 export function createGithubClient(githubToken: string): IGithubClient {
@@ -89,8 +92,11 @@ class GithubClient implements IGithubClient {
       });
       return {
         number: pull.number,
+        sha: pull.head.sha,
         html_url: pull.html_url,
+        action: result.action,
         created: true,
+        merged: false,
       } as Pull;
     } catch (e: unknown) {
       if (
@@ -123,8 +129,11 @@ class GithubClient implements IGithubClient {
     );
     return {
       number: pull.number,
+      sha: pull.head.sha,
       html_url: pull.html_url,
+      action: result.action,
       created: false,
+      merged: false,
     };
   }
 
@@ -200,7 +209,26 @@ class GithubClient implements IGithubClient {
     }
   }
 
-  stripOrgPrefixFromTeams(teams: string[]): string[] {
+  async mergePullRequest(pullRequest: Pull, inputs: IInputs): Promise<Pull> {
+    const repoOwner: string = inputs.REPO_OWNER;
+    const repoName: string = inputs.REPO_NAME;
+
+    let mergeResponse: { data: any } = { data: {} };
+    try {
+      mergeResponse = await this.api.rest.pulls.merge({
+        ...({ owner: repoOwner, repo: repoName } as Repository),
+        pull_number: pullRequest.number,
+        merge_method: inputs.MERGE_METHOD,
+      });
+    } catch (e) {
+      throw e;
+    } finally {
+      pullRequest.merged = mergeResponse.data.merged;
+    }
+    return pullRequest;
+  }
+
+  private stripOrgPrefixFromTeams(teams: string[]): string[] {
     return teams.map((team: string) => {
       const slashIndex: number = team.lastIndexOf('/');
       if (slashIndex > 0) {
@@ -209,6 +237,4 @@ class GithubClient implements IGithubClient {
       return team;
     });
   }
-
-  async mergePullRequest(): Promise<void> {}
 }
