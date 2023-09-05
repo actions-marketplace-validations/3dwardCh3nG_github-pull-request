@@ -2,12 +2,14 @@ import { IInputs, prepareInputValues } from '../src/inputs';
 
 describe('Test inputs.ts', (): void => {
   describe('Test prepareInputValues function', (): void => {
+    /* eslint-disable jest/expect-expect */
     it('should return IInputs with default values', (): void => {
       setRequiredProcessEnvValues();
       const inputs: IInputs = prepareInputValues();
       verifyRequiredValues(inputs);
       verifyOptionalDefaultValues(inputs);
     });
+    /* eslint-enable */
 
     it('should return IInputs with overriding values', (): void => {
       setRequiredProcessEnvValues();
