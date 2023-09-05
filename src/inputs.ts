@@ -23,7 +23,7 @@ export interface IInputs {
   SIGNOFF: boolean;
 }
 
-export const prepareInputValues = (): IInputs => {
+export const prepareInputValues: () => IInputs = (): IInputs => {
   return new Inputs(
     core.getInput('github_token', { required: true }),
     core.getInput('repo_owner', { required: true }),

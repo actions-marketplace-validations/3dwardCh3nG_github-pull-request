@@ -5,52 +5,79 @@ import { IInputs } from '../src/inputs';
 import * as service from '../src/service';
 import * as github from '../src/github-client';
 import { Pull } from '../src/github-client';
-import { createWorkflowUtils, IWorkflowUtils } from '../src/workflow-utils';
 
-const setOutputMock = jest.spyOn(core, 'setOutput');
-const setFailedMock = jest.spyOn(core, 'setFailed');
-const startGroupMock = jest.spyOn(core, 'startGroup');
-const endGroupMock = jest.spyOn(core, 'endGroup');
-const prepareInputValuesMock = jest.spyOn(inputs, 'prepareInputValues');
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const setOutputMock: jest.SpyInstance<
+  void,
+  [message: string, value: any],
+  unknown
+> = jest.spyOn(core, 'setOutput');
+const setFailedMock: jest.SpyInstance<
+  void,
+  [message: string | Error],
+  unknown
+> = jest.spyOn(core, 'setFailed');
+const startGroupMock: jest.SpyInstance<void, [message: string], unknown> =
+  jest.spyOn(core, 'startGroup');
+const endGroupMock: jest.SpyInstance<void, [], unknown> = jest.spyOn(
+  core,
+  'endGroup'
+);
+const prepareInputValuesMock: jest.SpyInstance<IInputs, [], unknown> =
+  jest.spyOn(inputs, 'prepareInputValues');
 let createServiceMock: jest.SpyInstance<service.IService, [IInputs]>;
-const createPullRequestMock = jest
-  .fn()
-  .mockImplementation(async (): Promise<github.Pull> => {
-    return {
-      number: 1,
-      sha: 'sha',
-      html_url: 'url',
-      action: 'created',
-      created: true,
-      merged: false
-    } as github.Pull;
-  });
 
-const createPullRequestThrowErrorMock = jest
-  .fn()
-  .mockImplementation(async (): Promise<github.Pull> => {
+const createPullRequestFunc: jest.Mock<any, any, any> = jest.fn();
+const createPullRequestMock: jest.SpyInstance<
+  void,
+  [message: string, value: any],
+  any
+> = createPullRequestFunc.mockImplementation(async (): Promise<github.Pull> => {
+  return {
+    number: 1,
+    sha: 'sha',
+    html_url: 'url',
+    action: 'created',
+    created: true,
+    merged: false
+  } as github.Pull;
+});
+
+const createPullRequestThrowErrorFunc: jest.Mock<any, any, any> = jest.fn();
+const createPullRequestThrowErrorMock: jest.SpyInstance<
+  void,
+  [message: string, value: any],
+  any
+> = createPullRequestThrowErrorFunc.mockImplementation(
+  async (): Promise<github.Pull> => {
     throw new Error('test error');
-  });
-
-const mergePullRequestWithRetriesMock = jest
-  .fn()
-  .mockImplementation((pullRequest: Pull): Promise<Pull> => {
+  }
+);
+const mergePullRequestWithRetriesFunc: jest.Mock<any, any, any> = jest.fn();
+const mergePullRequestWithRetriesMock: jest.SpyInstance<
+  void,
+  [message: string, value: any],
+  any
+> = mergePullRequestWithRetriesFunc.mockImplementation(
+  async (pullRequest: Pull): Promise<Pull> => {
     return Promise.resolve(pullRequest);
-  });
+  }
+);
 
-const mergePullRequestWithRetriesThrowErrorMock = jest
-  .fn()
-  .mockImplementation((pullRequest: Pull): Promise<Pull> => {
+const mergePullRequestWithRetriesThrowErrorFunc: jest.Mock<any, any, any> =
+  jest.fn();
+const mergePullRequestWithRetriesThrowErrorMock: jest.SpyInstance<
+  void,
+  [message: string, value: any],
+  any
+> = mergePullRequestWithRetriesThrowErrorFunc.mockImplementation(
+  async (): Promise<Pull> => {
     throw new Error('test error');
-  });
+  }
+);
+/* eslint-enable */
 
 describe('Test index.ts', (): void => {
-  let workflowUtils: IWorkflowUtils;
-
-  beforeAll(() => {
-    workflowUtils = createWorkflowUtils();
-  });
-
   describe('Test run function', (): void => {
     it('should call createPullRequest only when AUTO_MERGE is false', async (): Promise<void> => {
       createServiceMock = jest
@@ -66,7 +93,7 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocks();
-      expect(mergePullRequestWithRetriesMock).toBeCalledTimes(0);
+      expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(0);
     });
 
     it('should call createPullRequest and mergePullRequestWithRetries only when AUTO_MERGE is true', async (): Promise<void> => {
@@ -83,7 +110,7 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocks();
-      expect(mergePullRequestWithRetriesMock).toBeCalledTimes(1);
+      expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(1);
     });
 
     it('should throw error when createPullRequest throws error', async (): Promise<void> => {
@@ -100,10 +127,12 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocksWithError();
-      expect(createPullRequestMock).toBeCalledTimes(0);
-      expect(createPullRequestThrowErrorMock).toBeCalledTimes(1);
-      expect(mergePullRequestWithRetriesMock).toBeCalledTimes(0);
-      expect(mergePullRequestWithRetriesThrowErrorMock).toBeCalledTimes(0);
+      expect(createPullRequestMock).toHaveBeenCalledTimes(0);
+      expect(createPullRequestThrowErrorMock).toHaveBeenCalledTimes(1);
+      expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(0);
+      expect(mergePullRequestWithRetriesThrowErrorMock).toHaveBeenCalledTimes(
+        0
+      );
     });
 
     it('should throw error when mergePullRequestWithRetries throws error', async (): Promise<void> => {
@@ -120,26 +149,28 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocksWithError();
-      expect(createPullRequestMock).toBeCalledTimes(1);
-      expect(createPullRequestThrowErrorMock).toBeCalledTimes(0);
-      expect(mergePullRequestWithRetriesMock).toBeCalledTimes(0);
-      expect(mergePullRequestWithRetriesThrowErrorMock).toBeCalledTimes(1);
+      expect(createPullRequestMock).toHaveBeenCalledTimes(1);
+      expect(createPullRequestThrowErrorMock).toHaveBeenCalledTimes(0);
+      expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(0);
+      expect(mergePullRequestWithRetriesThrowErrorMock).toHaveBeenCalledTimes(
+        1
+      );
     });
   });
 });
 
 function createService(
-  inputs: IInputs,
+  i: IInputs,
   createPullRequestThrowError: boolean,
   mergePullRequestWithRetriesThrowError: boolean
 ): service.IService {
   return {
     createPullRequest: !createPullRequestThrowError
-      ? createPullRequestMock
+      ? createPullRequestFunc
       : createPullRequestThrowErrorMock,
     mergePullRequestWithRetries: !mergePullRequestWithRetriesThrowError
-      ? mergePullRequestWithRetriesMock
-      : mergePullRequestWithRetriesThrowErrorMock
+      ? mergePullRequestWithRetriesFunc
+      : mergePullRequestWithRetriesThrowErrorFunc
   } as service.IService;
 }
 
@@ -168,21 +199,21 @@ function getInputsWithAutoMergeValues(autoMerge: boolean): inputs.IInputs {
   } as IInputs;
 }
 
-function verifyMocks() {
-  expect(prepareInputValuesMock).toBeCalledTimes(1);
-  expect(createServiceMock).toBeCalledTimes(1);
-  expect(setOutputMock).toBeCalledTimes(6);
-  expect(setFailedMock).toBeCalledTimes(0);
-  expect(startGroupMock).toBeCalledTimes(1);
-  expect(endGroupMock).toBeCalledTimes(1);
-  expect(createPullRequestMock).toBeCalledTimes(1);
+function verifyMocks(): void {
+  expect(prepareInputValuesMock).toHaveBeenCalledTimes(1);
+  expect(createServiceMock).toHaveBeenCalledTimes(1);
+  expect(setOutputMock).toHaveBeenCalledTimes(6);
+  expect(setFailedMock).toHaveBeenCalledTimes(0);
+  expect(startGroupMock).toHaveBeenCalledTimes(1);
+  expect(endGroupMock).toHaveBeenCalledTimes(1);
+  expect(createPullRequestMock).toHaveBeenCalledTimes(1);
 }
 
-function verifyMocksWithError() {
-  expect(prepareInputValuesMock).toBeCalledTimes(1);
-  expect(createServiceMock).toBeCalledTimes(1);
-  expect(setOutputMock).toBeCalledTimes(0);
-  expect(setFailedMock).toBeCalledTimes(1);
-  expect(startGroupMock).toBeCalledTimes(0);
-  expect(endGroupMock).toBeCalledTimes(0);
+function verifyMocksWithError(): void {
+  expect(prepareInputValuesMock).toHaveBeenCalledTimes(1);
+  expect(createServiceMock).toHaveBeenCalledTimes(1);
+  expect(setOutputMock).toHaveBeenCalledTimes(0);
+  expect(setFailedMock).toHaveBeenCalledTimes(1);
+  expect(startGroupMock).toHaveBeenCalledTimes(0);
+  expect(endGroupMock).toHaveBeenCalledTimes(0);
 }

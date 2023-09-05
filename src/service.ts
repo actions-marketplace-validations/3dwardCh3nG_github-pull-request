@@ -107,7 +107,6 @@ class Service implements IService {
     try {
       pr = await this.mergePullRequest(githubClient, pr);
     } catch (error) {
-      let retryCount = 1;
       const maxRetries: number = this.inputs.MAX_MERGE_RETRIES;
       const retryInterval: number = this.inputs.MERGE_RETRY_INTERVAL;
       pr = await executeWithCustomised(
@@ -117,13 +116,6 @@ class Service implements IService {
         retryInterval,
         async (): Promise<Pull> => await this.mergePullRequest(githubClient, pr)
       );
-      while (retryCount <= maxRetries) {
-        core.info(`Retrying merge in ${retryInterval} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, retryInterval * 1000));
-        core.info(`Retry ${retryCount} of ${maxRetries}`);
-        pr = await this.mergePullRequest(githubClient, pr);
-        retryCount++;
-      }
     } finally {
       await gitAuthHelper.removeAuth();
     }
@@ -170,7 +162,7 @@ class Service implements IService {
       );
     }
 
-    const stashed = await git.stashPush(['--include-untracked']);
+    const stashed: boolean = await git.stashPush(['--include-untracked']);
 
     if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
       await git.fetchRemote(
@@ -181,7 +173,7 @@ class Service implements IService {
       await git.checkout(this.inputs.TARGET_BRANCH_NAME);
       await git.pull();
     }
-    const tempBranch = uuidv4();
+    const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
 
     let pullRequestBranchName: string = this.inputs.SOURCE_BRANCH_NAME;

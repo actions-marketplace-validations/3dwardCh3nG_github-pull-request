@@ -4,7 +4,7 @@ import { createService, IService } from './service';
 import { Pull } from './github-client';
 import { IInputs, prepareInputValues } from './inputs';
 
-export const run = async (): Promise<void> => {
+export const run: () => Promise<void> = async (): Promise<void> => {
   const workflowUtils: IWorkflowUtils = createWorkflowUtils();
 
   try {

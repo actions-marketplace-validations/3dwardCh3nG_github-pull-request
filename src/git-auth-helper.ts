@@ -105,7 +105,7 @@ class GitAuthHelper implements IGitAuthHelper {
   private async replaceTokenPlaceholder(configPath: string): Promise<void> {
     assert.ok(configPath, ErrorMessages.CONFIG_PATH_IS_NOT_DEFINED);
     let content: string = (await fs.promises.readFile(configPath)).toString();
-    const placeholderIndex = content.indexOf(
+    const placeholderIndex: number = content.indexOf(
       Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE
     );
     if (

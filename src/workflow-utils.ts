@@ -17,14 +17,14 @@ export function createWorkflowUtils(): IWorkflowUtils {
 
 class WorkflowUtils implements IWorkflowUtils {
   getRepoPath(relativePath?: string): string {
-    let ghWorkspacePath = process.env['GITHUB_WORKSPACE'];
+    let ghWorkspacePath: string | undefined = process.env['GITHUB_WORKSPACE'];
     if (!ghWorkspacePath) {
       throw new Error(ErrorMessages.GITHUB_WORKSPACE_NOT_DEFINED);
     }
     ghWorkspacePath = path.resolve(ghWorkspacePath);
     core.debug(`githubWorkspacePath: ${ghWorkspacePath}`);
 
-    let repoPath = ghWorkspacePath;
+    let repoPath: string = ghWorkspacePath;
     if (relativePath) repoPath = path.resolve(ghWorkspacePath, relativePath);
 
     core.debug(`repoPath: ${repoPath}`);

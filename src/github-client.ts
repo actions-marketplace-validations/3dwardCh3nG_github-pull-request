@@ -1,13 +1,14 @@
 import * as core from '@actions/core';
 import { Octokit } from '@octokit/core';
 import { OctokitOptions } from '@octokit/core/dist-types/types';
+import { OctokitResponse } from '@octokit/types/dist-types';
 import { IInputs } from './inputs';
 import { ICreateOrUpdatePullRequestBranchResult } from './service';
 import { restEndpointMethods } from '@octokit/plugin-rest-endpoint-methods';
 import { Api } from '@octokit/plugin-rest-endpoint-methods/dist-types/types';
 import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
 
-const ERROR_PR_REVIEW_TOKEN_SCOPE =
+const ERROR_PR_REVIEW_TOKEN_SCOPE: string =
   'Validation Failed: "Could not resolve to a node with the global id of';
 
 export interface Repository {
@@ -76,8 +77,8 @@ class GithubClient implements IGithubClient {
   ): Promise<Pull> {
     const repoOwner: string = inputs.REPO_OWNER;
     const repoName: string = inputs.REPO_NAME;
-    const repoBranch = `${repoOwner}:${result.targetBranch}`;
-    const headBranchFull = `${repoOwner}/${repoName}:${repoBranch}`;
+    const repoBranch: string = `${repoOwner}:${result.targetBranch}`;
+    const headBranchFull: string = `${repoOwner}/${repoName}:${repoBranch}`;
 
     try {
       core.info(`Trying to create the Pull Request`);
@@ -213,7 +214,10 @@ class GithubClient implements IGithubClient {
     const repoOwner: string = inputs.REPO_OWNER;
     const repoName: string = inputs.REPO_NAME;
 
-    const mergeResponse = await this.api.rest.pulls.merge({
+    const mergeResponse: OctokitResponse<
+      { sha: string; merged: boolean; message: string },
+      200
+    > = await this.api.rest.pulls.merge({
       ...({ owner: repoOwner, repo: repoName } as Repository),
       pull_number: pullRequest.number,
       merge_method: inputs.MERGE_METHOD

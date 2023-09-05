@@ -1,15 +1,15 @@
-export const InfoMessages = {
+export const InfoMessages: { [key: string]: string } = {
   INITIALISING_GIT_COMMAND_MANAGER: 'Initialising Git Command Manager...',
   PR_CREATED: 'Pull Request created successfully.',
   CONFIG_AUTH_HTTPS: 'Configuring credential for HTTPS authentication',
   PR_TARGET_REPO: 'Pull request branch target repository set to '
 };
-export const WarningMessages = {
+export const WarningMessages: { [key: string]: string } = {
   PR_BODY_TOO_LONG:
     'The maximum size of the Pull Request body 65536 character. Your input PR body message will be truncated shorter.'
 };
 
-export const ErrorMessages = {
+export const ErrorMessages: { [key: string]: string } = {
   GITHUB_WORKSPACE_NOT_DEFINED: 'GITHUB_WORKSPACE not defined',
   UNABLE_TO_REPLACE_AUTH_PLACEHOLDER: 'Unable to replace auth placeholder in ',
   CONFIG_PATH_IS_NOT_DEFINED: 'configPath is not defined',

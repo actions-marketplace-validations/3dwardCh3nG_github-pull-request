@@ -6,7 +6,7 @@ import { ErrorMessages, InfoMessages } from './message';
 import path from 'path';
 import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
 
-const tagsRefSpec = '+refs/tags/*:refs/tags/*';
+const tagsRefSpec: string = '+refs/tags/*:refs/tags/*';
 
 export interface IRemoteDetail {
   hostname: string;
@@ -121,7 +121,7 @@ export class GitCommandManager implements IGitCommandManager {
       } as IWorkingBaseAndType;
     } else {
       // detached HEAD
-      const headSha = await this.revParse('HEAD');
+      const headSha: string = await this.revParse('HEAD');
       return {
         workingBase: headSha,
         workingBaseType: 'commit'
@@ -134,7 +134,7 @@ export class GitCommandManager implements IGitCommandManager {
     if (options) {
       args.push(...options);
     }
-    const output = await this.execGit(args);
+    const output: GitExecOutput = await this.execGit(args);
     return output.getStdout().trim() !== 'No local changes to save';
   }
 
@@ -290,7 +290,7 @@ export class GitCommandManager implements IGitCommandManager {
     if (options) {
       args.push(...options);
     }
-    const output = await this.execGit(args);
+    const output: GitExecOutput = await this.execGit(args);
     return output.getStdout().trim();
   }
 
@@ -299,7 +299,7 @@ export class GitCommandManager implements IGitCommandManager {
     if (options) {
       args.push(...options);
     }
-    const output = await this.execGit(args, true);
+    const output: GitExecOutput = await this.execGit(args, true);
     return output.getExitCode() === 1;
   }
 
@@ -321,7 +321,7 @@ export class GitCommandManager implements IGitCommandManager {
     configKey: string,
     globalConfig?: boolean
   ): Promise<boolean> {
-    const output = await this.execGit(
+    const output: GitExecOutput = await this.execGit(
       [
         'config',
         globalConfig ? '--global' : '--local',
@@ -402,7 +402,7 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   private urlMatcher(url: string): RegExpMatchArray {
-    const pattern = '/^https?:\\/\\/(.+)$/i';
+    const pattern: string = '/^https?:\\/\\/(.+)$/i';
     const matches: RegExpMatchArray | null = url.match(pattern);
     if (!matches) {
       throw new Error(ErrorMessages.URL_MATCHER_FAILED);

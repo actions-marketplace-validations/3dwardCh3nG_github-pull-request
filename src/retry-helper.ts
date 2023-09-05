@@ -2,9 +2,9 @@ import * as core from '@actions/core';
 import { ErrorMessages } from './message';
 import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
 
-const defaultMaxAttempts = 3;
-const defaultMinSeconds = 10;
-const defaultMaxSeconds = 20;
+const defaultMaxAttempts: number = 3;
+const defaultMinSeconds: number = 10;
+const defaultMaxSeconds: number = 20;
 
 export async function executeWithDefaults<T>(
   action: (...vars: unknown[]) => Promise<T>
@@ -66,7 +66,7 @@ class RetryHelper {
   }
 
   async execute<T>(action: (...vars: unknown[]) => Promise<T>): Promise<T> {
-    let attempt = 1;
+    let attempt: number = 1;
     while (attempt < this.maxAttempts) {
       // Try
       try {
