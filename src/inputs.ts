@@ -18,9 +18,9 @@ export interface IInputs {
   MILESTONE: number | undefined;
   ASSIGNEES: string[] | undefined;
   REVIEWERS: string[] | undefined;
-  REAM_REVIEWERS: string[] | undefined;
+  TEAM_REVIEWERS: string[] | undefined;
   LABELS: string[] | undefined;
-  SIGNOFF: boolean | undefined;
+  SIGNOFF: boolean;
 }
 
 export const prepareInputValues = (): IInputs => {
@@ -71,9 +71,9 @@ class Inputs implements IInputs {
   MILESTONE: number | undefined;
   ASSIGNEES: string[] | undefined;
   REVIEWERS: string[] | undefined;
-  REAM_REVIEWERS: string[] | undefined;
+  TEAM_REVIEWERS: string[] | undefined;
   LABELS: string[] | undefined;
-  SIGNOFF: boolean | undefined;
+  SIGNOFF: boolean;
 
   constructor(
     githubToken: string,
@@ -108,21 +108,21 @@ class Inputs implements IInputs {
     this.DRAFT = draft;
     this.REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
     this.AUTO_MERGE = autoMerge;
-    this.MERGE_METHOD = ('merge' || 'squash' || 'rebase').match(mergeMethod)
+    this.MERGE_METHOD = ['merge', 'squash', 'rebase'].includes(mergeMethod)
       ? (mergeMethod as 'merge' | 'squash' | 'rebase')
       : 'merge';
     this.MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
     this.MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
     this.MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
     this.ASSIGNEES =
-      assignees.length === 1 && assignees[0] === '' ? assignees : undefined;
+      assignees.length === 1 && assignees[0] === '' ? undefined : assignees;
     this.REVIEWERS =
-      reviewers.length === 1 && reviewers[0] === '' ? reviewers : undefined;
-    this.REAM_REVIEWERS =
+      reviewers.length === 1 && reviewers[0] === '' ? undefined : reviewers;
+    this.TEAM_REVIEWERS =
       teamReviewers.length === 1 && teamReviewers[0] === ''
-        ? teamReviewers
-        : undefined;
-    this.LABELS = labels.length === 1 && labels[0] === '' ? labels : undefined;
+        ? undefined
+        : teamReviewers;
+    this.LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
     this.SIGNOFF = signoff;
   }
 }

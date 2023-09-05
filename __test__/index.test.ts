@@ -7,7 +7,6 @@ import * as github from '../src/github-client';
 import { Pull } from '../src/github-client';
 import { createWorkflowUtils, IWorkflowUtils } from '../src/workflow-utils';
 
-const infoMock = jest.spyOn(core, 'info');
 const setOutputMock = jest.spyOn(core, 'setOutput');
 const setFailedMock = jest.spyOn(core, 'setFailed');
 const startGroupMock = jest.spyOn(core, 'startGroup');
@@ -45,15 +44,15 @@ const mergePullRequestWithRetriesThrowErrorMock = jest
     throw new Error('test error');
   });
 
-describe('Test index.ts', () => {
+describe('Test index.ts', (): void => {
   let workflowUtils: IWorkflowUtils;
 
   beforeAll(() => {
     workflowUtils = createWorkflowUtils();
   });
 
-  describe('Test run function', () => {
-    it('should call createPullRequest only when AUTO_MERGE is false', async () => {
+  describe('Test run function', (): void => {
+    it('should call createPullRequest only when AUTO_MERGE is false', async (): Promise<void> => {
       createServiceMock = jest
         .spyOn(service, 'createService')
         .mockImplementation(
@@ -70,7 +69,7 @@ describe('Test index.ts', () => {
       expect(mergePullRequestWithRetriesMock).toBeCalledTimes(0);
     });
 
-    it('should call createPullRequest and mergePullRequestWithRetries only when AUTO_MERGE is true', async () => {
+    it('should call createPullRequest and mergePullRequestWithRetries only when AUTO_MERGE is true', async (): Promise<void> => {
       createServiceMock = jest
         .spyOn(service, 'createService')
         .mockImplementation(
@@ -87,7 +86,7 @@ describe('Test index.ts', () => {
       expect(mergePullRequestWithRetriesMock).toBeCalledTimes(1);
     });
 
-    it('should throw error when createPullRequest throws error', async () => {
+    it('should throw error when createPullRequest throws error', async (): Promise<void> => {
       createServiceMock = jest
         .spyOn(service, 'createService')
         .mockImplementation(
@@ -107,7 +106,7 @@ describe('Test index.ts', () => {
       expect(mergePullRequestWithRetriesThrowErrorMock).toBeCalledTimes(0);
     });
 
-    it('should throw error when mergePullRequestWithRetries throws error', async () => {
+    it('should throw error when mergePullRequestWithRetries throws error', async (): Promise<void> => {
       createServiceMock = jest
         .spyOn(service, 'createService')
         .mockImplementation(
@@ -163,9 +162,9 @@ function getInputsWithAutoMergeValues(autoMerge: boolean): inputs.IInputs {
     MILESTONE: undefined,
     ASSIGNEES: undefined,
     REVIEWERS: undefined,
-    REAM_REVIEWERS: undefined,
+    TEAM_REVIEWERS: undefined,
     LABELS: undefined,
-    SIGNOFF: undefined
+    SIGNOFF: false
   } as IInputs;
 }
 

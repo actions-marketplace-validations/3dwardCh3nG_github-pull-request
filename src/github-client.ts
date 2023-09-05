@@ -180,9 +180,9 @@ class GithubClient implements IGithubClient {
       requestReviewersParams['reviewers'] = inputs.REVIEWERS;
       core.info(`Requesting reviewers '${inputs.REVIEWERS}'`);
     }
-    if (inputs.REAM_REVIEWERS && inputs.REAM_REVIEWERS.length > 0) {
+    if (inputs.TEAM_REVIEWERS && inputs.TEAM_REVIEWERS.length > 0) {
       const teams: string[] = this.stripOrgPrefixFromTeams(
-        inputs.REAM_REVIEWERS
+        inputs.TEAM_REVIEWERS
       );
       requestReviewersParams['team_reviewers'] = teams;
       core.info(`Requesting team reviewers '${teams}'`);
