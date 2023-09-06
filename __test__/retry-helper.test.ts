@@ -1,5 +1,91 @@
-describe('Test retry-helper.ts', (): void => {
-  describe('Test executeWithDefaults function', (): void => {});
+import * as core from '@actions/core';
+import { createRetryHelper } from '../src/retry-helper-wrapper';
 
-  describe('Test executeWithCustomised function', (): void => {});
+const infoMock: jest.SpyInstance<void, [message: string]> = jest.spyOn(
+  core,
+  'info'
+);
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+describe('Test retry-helper.ts', (): void => {
+  describe('Test RetryHelper.execute function', (): void => {
+    let retryHelperInstance: any;
+    let sleepMock: jest.SpyInstance<void, any[]>;
+    let retryFuncMock: jest.Mock<any, any, any>;
+    let getSleepAmountSpy: jest.SpyInstance<void, any[]>;
+
+    afterEach((): void => {
+      retryHelperInstance = undefined;
+      sleepMock.mockClear();
+      retryFuncMock.mockClear();
+      getSleepAmountSpy.mockClear();
+    });
+
+    it('should retry default 3 times with random interval', async (): Promise<void> => {
+      retryHelperInstance = createRetryHelper(3, 10, 20, undefined);
+      retryFuncMock = jest
+        .fn()
+        .mockImplementation(async (): Promise<string> => {
+          throw new Error('test');
+        });
+      sleepMock = jest
+        .spyOn(retryHelperInstance, 'sleep')
+        .mockImplementation(async (): Promise<void> => {
+          return new Promise(resolve => setTimeout(resolve, 1000));
+        });
+      getSleepAmountSpy = jest.spyOn(retryHelperInstance, 'getSleepAmount');
+
+      await expect(retryHelperInstance.execute(retryFuncMock)).rejects.toEqual(
+        new Error('test')
+      );
+      expect(retryFuncMock).toHaveBeenCalledTimes(3);
+      expect(sleepMock).toHaveBeenCalledTimes(2);
+      expect(getSleepAmountSpy).toHaveBeenCalledTimes(2);
+      expect(infoMock).toHaveBeenCalledTimes(5);
+    });
+
+    it('should retry 5 times with random interval', async (): Promise<void> => {
+      retryHelperInstance = createRetryHelper(5, 1, 5, undefined);
+      retryFuncMock = jest
+        .fn()
+        .mockImplementation(async (): Promise<string> => {
+          throw new Error('test');
+        });
+      sleepMock = jest
+        .spyOn(retryHelperInstance, 'sleep')
+        .mockImplementation(async (): Promise<void> => {
+          return new Promise(resolve => setTimeout(resolve, 1000));
+        });
+      getSleepAmountSpy = jest.spyOn(retryHelperInstance, 'getSleepAmount');
+
+      await expect(retryHelperInstance.execute(retryFuncMock)).rejects.toEqual(
+        new Error('test')
+      );
+      expect(retryFuncMock).toHaveBeenCalledTimes(5);
+      expect(sleepMock).toHaveBeenCalledTimes(4);
+      expect(getSleepAmountSpy).toHaveBeenCalledTimes(4);
+      expect(infoMock).toHaveBeenCalledTimes(9);
+    });
+
+    it('should retry 2 times with input interval', async (): Promise<void> => {
+      retryHelperInstance = createRetryHelper(3, 10, 20, 1);
+      retryFuncMock = jest
+        .fn()
+        .mockImplementation(async (): Promise<string> => {
+          throw new Error('test');
+        });
+      sleepMock = jest.spyOn(retryHelperInstance, 'sleep');
+      getSleepAmountSpy = jest.spyOn(retryHelperInstance, 'getSleepAmount');
+
+      await expect(retryHelperInstance.execute(retryFuncMock)).rejects.toEqual(
+        new Error('test')
+      );
+      expect(retryFuncMock).toHaveBeenCalledTimes(3);
+      expect(sleepMock).toHaveBeenCalledTimes(2);
+      expect(sleepMock).toHaveBeenCalledWith(1);
+      expect(getSleepAmountSpy).toHaveBeenCalledTimes(2);
+      expect(infoMock).toHaveBeenCalledTimes(5);
+    });
+  });
 });
+/* eslint-enable @typescript-eslint/no-explicit-any */

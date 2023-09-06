@@ -2,44 +2,17 @@ import * as core from '@actions/core';
 import { ErrorMessages } from './message';
 import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
 
-const defaultMaxAttempts: number = 3;
-const defaultMinSeconds: number = 10;
-const defaultMaxSeconds: number = 20;
-
-export async function executeWithDefaults<T>(
-  action: (...vars: unknown[]) => Promise<T>
-): Promise<T> {
-  const retryHelper: RetryHelper = new RetryHelper(
-    defaultMaxAttempts,
-    defaultMinSeconds,
-    defaultMaxSeconds,
-    undefined
-  );
-  return await retryHelper.execute(action);
+export interface IRetryHelper {
+  execute<T>(action: (...vars: unknown[]) => Promise<T>): Promise<T>;
 }
 
-export async function executeWithCustomised<T>(
-  maxAttempts: number,
-  minSeconds: number | undefined,
-  maxSecond: number | undefined,
-  attemptsInterval: number | undefined,
-  action: (...vars: unknown[]) => Promise<T>
-): Promise<T> {
-  const retryHelper: RetryHelper = new RetryHelper(
-    maxAttempts,
-    minSeconds,
-    maxSecond,
-    attemptsInterval
-  );
-  return await retryHelper.execute(action);
-}
-
-class RetryHelper {
+// export class RetryHelper implements IRetryHelper {
+export class RetryHelper implements IRetryHelper {
   private readonly workflowUtils: IWorkflowUtils;
-  private maxAttempts: number;
-  private minSeconds: number | undefined;
-  private maxSeconds: number | undefined;
-  private attemptsInterval: number | undefined;
+  private readonly maxAttempts: number;
+  private readonly minSeconds: number | undefined;
+  private readonly maxSeconds: number | undefined;
+  private readonly attemptsInterval: number | undefined;
 
   constructor(
     maxAttempts: number,
@@ -76,20 +49,25 @@ class RetryHelper {
       }
 
       // Sleep
-      const seconds: number =
-        this.attemptsInterval !== undefined
-          ? this.attemptsInterval
-          : this.getSleepAmount();
+      const seconds: number = this.getSleepAmount();
       core.info(`Waiting ${seconds} seconds before trying again`);
       await this.sleep(seconds);
       attempt++;
     }
 
     // Last attempt
-    return await action();
+    try {
+      return await action();
+    } catch (err) {
+      core.info(this.workflowUtils.getErrorMessage(err));
+      throw err;
+    }
   }
 
   private getSleepAmount(): number {
+    if (this.attemptsInterval !== undefined) {
+      return this.attemptsInterval;
+    }
     if (this.minSeconds === undefined || this.maxSeconds === undefined) {
       throw Error(
         "minSeconds and maxSeconds cannot be undefined when attemptsInterval isn't provided"
