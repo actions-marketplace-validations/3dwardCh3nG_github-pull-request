@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import { createRetryHelper } from '../src/retry-helper-wrapper';
+import { ErrorMessages } from '../src/message';
 
 const infoMock: jest.SpyInstance<void, [message: string]> = jest.spyOn(
   core,
@@ -85,6 +86,43 @@ describe('Test retry-helper.ts', (): void => {
       expect(sleepMock).toHaveBeenCalledWith(1);
       expect(getSleepAmountSpy).toHaveBeenCalledTimes(2);
       expect(infoMock).toHaveBeenCalledTimes(5);
+    });
+  });
+
+  describe('Test constructor', (): void => {
+    it('should create RetryHelper instance when minSeconds and maxSeconds are undefined but attemptsInterval is not', (): void => {
+      const retryHelperInstance: any = createRetryHelper(
+        3,
+        undefined,
+        undefined,
+        5
+      );
+      expect(retryHelperInstance).toBeDefined();
+      expect(retryHelperInstance.minSeconds).toBe(undefined);
+      expect(retryHelperInstance.maxSeconds).toBe(undefined);
+    });
+
+    it('should throw error when minSeconds is greater than maxSeconds', (): void => {
+      expect((): any => createRetryHelper(3, 20, 10, undefined)).toThrow(
+        new Error(ErrorMessages.RETRY_HELPER_MIN_SECONDS_MAX_SECONDS_ERROR)
+      );
+    });
+  });
+
+  describe('Test getSleepAmount function', (): void => {
+    it('should throw error when minSeconds and maxSeconds are undefined and attemptsInterval is also undefined', (): void => {
+      const retryHelperInstance: any = createRetryHelper(
+        3,
+        undefined,
+        undefined,
+        undefined
+      );
+      expect(retryHelperInstance).toBeDefined();
+      expect((): any => retryHelperInstance.getSleepAmount()).toThrow(
+        new Error(
+          "minSeconds and maxSeconds cannot be undefined when attemptsInterval isn't provided"
+        )
+      );
     });
   });
 });
