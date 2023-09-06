@@ -1,7 +1,7 @@
 import { IInputs } from './inputs';
 import { ErrorMessages, InfoMessages, WarningMessages } from './message';
 import * as core from '@actions/core';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 import {
   createGitCommandManager,
   IGitCommandManager,
@@ -46,7 +46,7 @@ class Service implements IService {
 
   constructor(inputs: IInputs) {
     this.inputs = inputs;
-    this.workflowUtils = createWorkflowUtils();
+    this.workflowUtils = new WorkflowUtils();
     this.inputDataChecks();
   }
 

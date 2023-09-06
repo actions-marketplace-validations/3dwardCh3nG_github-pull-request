@@ -6,7 +6,7 @@ import { IInputs } from './inputs';
 import { ICreateOrUpdatePullRequestBranchResult } from './service';
 import { restEndpointMethods } from '@octokit/plugin-rest-endpoint-methods';
 import { Api } from '@octokit/plugin-rest-endpoint-methods/dist-types/types';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 
 const ERROR_PR_REVIEW_TOKEN_SCOPE: string =
   'Validation Failed: "Could not resolve to a node with the global id of';
@@ -51,7 +51,7 @@ class GithubClient implements IGithubClient {
   private readonly api: Api;
 
   constructor(githubToken: string) {
-    this.workflowUtils = createWorkflowUtils();
+    this.workflowUtils = new WorkflowUtils();
 
     const options: OctokitOptions = {};
     if (githubToken) {

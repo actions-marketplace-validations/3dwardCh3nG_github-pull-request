@@ -13712,7 +13712,7 @@ class GitCommandManager {
     gitPath = '';
     workingDirectory = '';
     constructor() {
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
     }
     static async create(workingDirectory) {
         const gitCommandManager = new GitCommandManager();
@@ -14114,7 +14114,7 @@ class GithubClient {
     octokit;
     api;
     constructor(githubToken) {
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
         const options = {};
         if (githubToken) {
             options.auth = `${githubToken}`;
@@ -14306,7 +14306,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const service_1 = __nccwpck_require__(2115);
 const inputs_1 = __nccwpck_require__(7063);
 const run = async () => {
-    const workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+    const workflowUtils = new workflow_utils_1.WorkflowUtils();
     try {
         const inputs = (0, inputs_1.prepareInputValues)();
         const service = (0, service_1.createService)(inputs);
@@ -14531,7 +14531,7 @@ class RetryHelper {
     maxSeconds;
     attemptsInterval;
     constructor(maxAttempts, minSeconds, maxSeconds, attemptsInterval) {
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
         this.maxAttempts = maxAttempts;
         this.minSeconds =
             minSeconds === undefined ? undefined : Math.floor(minSeconds);
@@ -14637,7 +14637,7 @@ class Service {
     workflowUtils;
     constructor(inputs) {
         this.inputs = inputs;
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
         this.inputDataChecks();
     }
     async createPullRequest() {
@@ -14860,15 +14860,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createWorkflowUtils = void 0;
+exports.WorkflowUtils = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const path = __importStar(__nccwpck_require__(1017));
 const message_1 = __nccwpck_require__(7899);
 const fs_1 = __importDefault(__nccwpck_require__(7147));
-function createWorkflowUtils() {
-    return new WorkflowUtils();
-}
-exports.createWorkflowUtils = createWorkflowUtils;
 class WorkflowUtils {
     getRepoPath(relativePath) {
         let ghWorkspacePath = process.env['GITHUB_WORKSPACE'];
@@ -14909,6 +14905,7 @@ class WorkflowUtils {
         return typeof (error && error.code) === 'string';
     }
 }
+exports.WorkflowUtils = WorkflowUtils;
 
 
 /***/ }),

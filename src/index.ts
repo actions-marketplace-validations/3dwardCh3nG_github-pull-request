@@ -1,11 +1,11 @@
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 import * as core from '@actions/core';
 import { createService, IService } from './service';
 import { Pull } from './github-client';
 import { IInputs, prepareInputValues } from './inputs';
 
 export const run: () => Promise<void> = async (): Promise<void> => {
-  const workflowUtils: IWorkflowUtils = createWorkflowUtils();
+  const workflowUtils: IWorkflowUtils = new WorkflowUtils();
 
   try {
     const inputs: IInputs = prepareInputValues();

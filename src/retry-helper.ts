@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { ErrorMessages } from './message';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 
 export interface IRetryHelper {
   execute<T>(action: (...vars: unknown[]) => Promise<T>): Promise<T>;
@@ -20,7 +20,7 @@ export class RetryHelper implements IRetryHelper {
     maxSeconds: number | undefined,
     attemptsInterval: number | undefined
   ) {
-    this.workflowUtils = createWorkflowUtils();
+    this.workflowUtils = new WorkflowUtils();
 
     this.maxAttempts = maxAttempts;
     this.minSeconds =

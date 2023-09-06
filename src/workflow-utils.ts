@@ -11,11 +11,7 @@ export interface IWorkflowUtils {
   getErrorMessage(error: unknown): string;
 }
 
-export function createWorkflowUtils(): IWorkflowUtils {
-  return new WorkflowUtils();
-}
-
-class WorkflowUtils implements IWorkflowUtils {
+export class WorkflowUtils implements IWorkflowUtils {
   getRepoPath(relativePath?: string): string {
     let ghWorkspacePath: string | undefined = process.env['GITHUB_WORKSPACE'];
     if (!ghWorkspacePath) {

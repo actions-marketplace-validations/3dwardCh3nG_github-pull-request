@@ -4,7 +4,7 @@ import * as exec from '@actions/exec';
 import { GitExecOutput } from './git-exec-output';
 import { ErrorMessages, InfoMessages } from './message';
 import path from 'path';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 
 const tagsRefSpec: string = '+refs/tags/*:refs/tags/*';
 
@@ -84,7 +84,7 @@ export class GitCommandManager implements IGitCommandManager {
   private workingDirectory = '';
 
   private constructor() {
-    this.workflowUtils = createWorkflowUtils();
+    this.workflowUtils = new WorkflowUtils();
   }
 
   static async create(workingDirectory: string): Promise<GitCommandManager> {
