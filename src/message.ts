@@ -24,5 +24,8 @@ export const ErrorMessages: { [key: string]: string } = {
   TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS:
     'When in the detached HEAD state, the target_branch input must be supplied.',
   TARGET_BRANCH_IS_NOT_SUPPLIED:
-    'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.'
+    'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.',
+  FILE_EXISTS_CHECK_ERROR:
+    'Encountered an error when checking whether path exists: ',
+  FILE_EXISTS_CHECK_INPUT_ERROR: "Arg 'filePath' must not be empty"
 };

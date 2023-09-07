@@ -29,7 +29,7 @@ export class WorkflowUtils implements IWorkflowUtils {
 
   fileExistsSync(filePath: string): boolean {
     if (!filePath) {
-      throw new Error("Arg 'filePath' must not be empty");
+      throw new Error(ErrorMessages.FILE_EXISTS_CHECK_INPUT_ERROR);
     }
 
     let stats: fs.Stats;
@@ -44,9 +44,7 @@ export class WorkflowUtils implements IWorkflowUtils {
       }
 
       throw new Error(
-        `Encountered an error when checking whether path '${path}' exists: ${this.getErrorMessage(
-          error
-        )}`
+        ErrorMessages.FILE_EXISTS_CHECK_ERROR + this.getErrorMessage(error)
       );
     }
 
