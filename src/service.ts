@@ -13,7 +13,7 @@ import {
   createSourceSettings,
   IGitSourceSettings
 } from './git-source-settings';
-import { createGithubClient, IGithubClient, Pull } from './github-client';
+import { GithubClient, IGithubClient, Pull } from './github-client';
 import { v4 as uuidv4 } from 'uuid';
 import { executeWithCustomised } from './retry-helper-wrapper';
 
@@ -43,10 +43,12 @@ export function createService(inputs: IInputs): IService {
 class Service implements IService {
   private readonly inputs: IInputs;
   private readonly workflowUtils: IWorkflowUtils;
+  private readonly githubClient: IGithubClient;
 
   constructor(inputs: IInputs) {
     this.inputs = inputs;
     this.workflowUtils = new WorkflowUtils();
+    this.githubClient = new GithubClient(this.inputs.GITHUB_TOKEN);
     this.inputDataChecks();
   }
 
@@ -74,10 +76,7 @@ class Service implements IService {
 
       if (result.hasDiffWithTargetBranch) {
         core.startGroup('Create or update the pull request');
-        const githubClient: IGithubClient = createGithubClient(
-          this.inputs.GITHUB_TOKEN
-        );
-        pullRequest = await githubClient.preparePullRequest(
+        pullRequest = await this.githubClient.preparePullRequest(
           this.inputs,
           result
         );
@@ -95,9 +94,6 @@ class Service implements IService {
     const response: IGitPreparationResponse =
       await this.prepareGitAuthentication();
     const gitAuthHelper: IGitAuthHelper = response.gitAuthHelper;
-    const githubClient: IGithubClient = createGithubClient(
-      this.inputs.GITHUB_TOKEN
-    );
     let pr: Pull = {
       number: pullRequest.number,
       html_url: pullRequest.html_url,
@@ -106,7 +102,7 @@ class Service implements IService {
     } as Pull;
 
     try {
-      pr = await this.mergePullRequest(githubClient, pr);
+      pr = await this.mergePullRequest(pr);
     } catch (error) {
       const maxRetries: number = this.inputs.MAX_MERGE_RETRIES;
       const retryInterval: number = this.inputs.MERGE_RETRY_INTERVAL;
@@ -115,7 +111,7 @@ class Service implements IService {
         undefined,
         undefined,
         retryInterval,
-        async (): Promise<Pull> => await this.mergePullRequest(githubClient, pr)
+        async (): Promise<Pull> => await this.mergePullRequest(pr)
       );
     } finally {
       await gitAuthHelper.removeAuth();
@@ -123,13 +119,10 @@ class Service implements IService {
     return pr;
   }
 
-  async mergePullRequest(
-    githubClient: IGithubClient,
-    pullRequest: Pull
-  ): Promise<Pull> {
+  async mergePullRequest(pullRequest: Pull): Promise<Pull> {
     try {
       core.startGroup(`Merging pull request #${pullRequest.number}`);
-      pullRequest = await githubClient.mergePullRequest(
+      pullRequest = await this.githubClient.mergePullRequest(
         pullRequest,
         this.inputs
       );

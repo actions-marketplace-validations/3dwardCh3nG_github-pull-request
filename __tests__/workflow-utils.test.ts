@@ -61,8 +61,6 @@ describe('Test workflow-utils.ts', (): void => {
   });
 
   describe('Test fileExistsSync function', (): void => {
-    beforeAll((): void => {});
-
     it('will return true when file exists', (): void => {
       jest.spyOn(fs, 'statSync').mockImplementation(() => {
         return { isDirectory: (): boolean => false } as fs.Stats;
