@@ -113,7 +113,7 @@ export class GitCommandManager implements IGitCommandManager {
       ['symbolic-ref', 'HEAD', '--short'],
       true
     );
-    if (symbolicRefResult.getExitCode() === 0) {
+    if (symbolicRefResult.exitCode === 0) {
       // ref
       return {
         workingBase: symbolicRefResult.getStdout(),
@@ -287,7 +287,7 @@ export class GitCommandManager implements IGitCommandManager {
       args.push(...options);
     }
     const output: GitExecOutput = await this.execGit(args, true);
-    return output.getExitCode() === 1;
+    return output.exitCode === 1;
   }
 
   async config(
@@ -318,7 +318,7 @@ export class GitCommandManager implements IGitCommandManager {
       ],
       true
     );
-    return output.getExitCode() === 0;
+    return output.exitCode === 0;
   }
 
   async unsetConfig(
@@ -334,7 +334,7 @@ export class GitCommandManager implements IGitCommandManager {
       ],
       true
     );
-    return output.getExitCode() === 0;
+    return output.exitCode === 0;
   }
 
   getWorkingDirectory(): string {
@@ -388,7 +388,7 @@ export class GitCommandManager implements IGitCommandManager {
     };
 
     const exitCode: number = await exec.exec(this.gitPath, args, execOptions);
-    output.setExitCode(exitCode);
+    output.exitCode = exitCode;
 
     return output;
   }

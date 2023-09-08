@@ -42,12 +42,10 @@ class GitAuthHelper implements IGitAuthHelper {
   }
 
   private init(): void {
-    const serverUrl: URL = this.getServerUrl(
-      this.settings.getGithubServerUrl()
-    );
+    const serverUrl: URL = this.getServerUrl(this.settings.githubServerUrl);
     this.tokenConfigKey = `http.${serverUrl.origin}/.extraheader`;
     const basicCredential: string = Buffer.from(
-      `x-access-token:${this.settings.getAuthToken()}`,
+      `x-access-token:${this.settings.authToken}`,
       'utf8'
     ).toString('base64');
     core.setSecret(basicCredential);
