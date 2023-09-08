@@ -27,5 +27,9 @@ export const ErrorMessages: { [key: string]: string } = {
     'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.',
   FILE_EXISTS_CHECK_ERROR:
     'Encountered an error when checking whether path exists: ',
-  FILE_EXISTS_CHECK_INPUT_ERROR: "Arg 'filePath' must not be empty"
+  FILE_EXISTS_CHECK_INPUT_ERROR: 'Arg "filePath" must not be empty',
+  ERROR_PR_REVIEW_TOKEN_SCOPE:
+    'Validation Failed: Could not resolve to a node with the global id of',
+  UPDATE_REVIEWER_ERROR:
+    "Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required."
 };

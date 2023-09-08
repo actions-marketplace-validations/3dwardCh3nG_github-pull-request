@@ -8,9 +8,7 @@ import { restEndpointMethods } from '@octokit/plugin-rest-endpoint-methods';
 import { Api } from '@octokit/plugin-rest-endpoint-methods/dist-types/types';
 import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 import * as process from 'process';
-
-const ERROR_PR_REVIEW_TOKEN_SCOPE: string =
-  'Validation Failed: "Could not resolve to a node with the global id of';
+import { ErrorMessages } from './message';
 
 export interface Repository {
   owner: string;
@@ -196,11 +194,9 @@ export class GithubClient implements IGithubClient {
         if (
           this.workflowUtils
             .getErrorMessage(e)
-            .includes(ERROR_PR_REVIEW_TOKEN_SCOPE)
+            .includes(ErrorMessages.ERROR_PR_REVIEW_TOKEN_SCOPE)
         ) {
-          core.error(
-            `Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required.`
-          );
+          core.error(ErrorMessages.UPDATE_REVIEWER_ERROR);
         }
         throw e;
       }

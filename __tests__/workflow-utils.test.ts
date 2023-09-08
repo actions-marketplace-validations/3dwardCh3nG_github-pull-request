@@ -4,7 +4,7 @@ import { ErrorMessages } from '../src/message';
 import path from 'path';
 import fs from 'fs';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, no-throw-literal */
 jest.mock('path', () => {
   return {
     resolve: jest.fn().mockImplementation((...paths: string[]): string => {
@@ -110,7 +110,6 @@ describe('Test workflow-utils.ts', (): void => {
 
     it('will throw error when error of a string', (): void => {
       jest.spyOn(fs, 'statSync').mockImplementation(() => {
-        // eslint-disable-next-line @typescript-eslint/no-throw-literal
         throw 'string error';
       });
 
