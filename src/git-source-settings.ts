@@ -1,37 +1,17 @@
 export interface IGitSourceSettings {
-  getRepositoryPath(): string;
-
-  getRepositoryOwner(): string;
-
-  getRepositoryName(): string;
-
-  getAuthToken(): string;
-
-  getGithubServerUrl(): string | undefined;
+  readonly repositoryPath: string;
+  readonly repositoryOwner: string;
+  readonly repositoryName: string;
+  readonly authToken: string;
+  readonly githubServerUrl: string | undefined;
 }
 
-export function createSourceSettings(
-  repositoryPath: string,
-  repositoryOwner: string,
-  repositoryName: string,
-  authToken: string,
-  githubServerUrl: string | undefined
-): IGitSourceSettings {
-  return new GitSourceSettings(
-    repositoryPath,
-    repositoryOwner,
-    repositoryName,
-    authToken,
-    githubServerUrl
-  );
-}
-
-class GitSourceSettings implements IGitSourceSettings {
-  private readonly repositoryPath: string;
-  private readonly repositoryOwner: string;
-  private readonly repositoryName: string;
-  private readonly authToken: string;
-  private readonly githubServerUrl: string | undefined;
+export class GitSourceSettings implements IGitSourceSettings {
+  private readonly _repositoryPath: string;
+  private readonly _repositoryOwner: string;
+  private readonly _repositoryName: string;
+  private readonly _authToken: string;
+  private readonly _githubServerUrl: string | undefined;
 
   constructor(
     repositoryPath: string,
@@ -40,30 +20,30 @@ class GitSourceSettings implements IGitSourceSettings {
     authToken: string,
     githubServerUrl: string | undefined
   ) {
-    this.repositoryPath = repositoryPath;
-    this.repositoryOwner = repositoryOwner;
-    this.repositoryName = repositoryName;
-    this.authToken = authToken;
-    this.githubServerUrl = githubServerUrl;
+    this._repositoryPath = repositoryPath;
+    this._repositoryOwner = repositoryOwner;
+    this._repositoryName = repositoryName;
+    this._authToken = authToken;
+    this._githubServerUrl = githubServerUrl;
   }
 
-  getRepositoryPath(): string {
-    return this.repositoryPath;
+  get repositoryPath(): string {
+    return this._repositoryPath;
   }
 
-  getRepositoryOwner(): string {
-    return this.repositoryOwner;
+  get repositoryOwner(): string {
+    return this._repositoryOwner;
   }
 
-  getRepositoryName(): string {
-    return this.repositoryName;
+  get repositoryName(): string {
+    return this._repositoryName;
   }
 
-  getAuthToken(): string {
-    return this.authToken;
+  get authToken(): string {
+    return this._authToken;
   }
 
-  getGithubServerUrl(): string | undefined {
-    return this.githubServerUrl;
+  get githubServerUrl(): string | undefined {
+    return this._githubServerUrl;
   }
 }

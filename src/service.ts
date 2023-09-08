@@ -9,10 +9,7 @@ import {
   IWorkingBaseAndType
 } from './git-command-manager';
 import { createAuthHelper, IGitAuthHelper } from './git-auth-helper';
-import {
-  createSourceSettings,
-  IGitSourceSettings
-} from './git-source-settings';
+import { GitSourceSettings, IGitSourceSettings } from './git-source-settings';
 import { GithubClient, IGithubClient, Pull } from './github-client';
 import { v4 as uuidv4 } from 'uuid';
 import { executeWithCustomised } from './retry-helper-wrapper';
@@ -265,7 +262,7 @@ class Service implements IService {
   private async prepareGitAuthentication(): Promise<IGitPreparationResponse> {
     const repoPath: string = this.workflowUtils.getRepoPath();
     const git: IGitCommandManager = await createGitCommandManager(repoPath);
-    const gitSourceSettings: IGitSourceSettings = createSourceSettings(
+    const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
       repoPath,
       this.inputs.REPO_OWNER,
       this.inputs.REPO_NAME,
