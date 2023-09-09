@@ -1,6 +1,6 @@
 import { GitExecOutput } from '../src/git-exec-output';
 
-describe('Test git-exec-outputs.ts', (): void => {
+describe('Test git-exec-output.ts', (): void => {
   let gitExecOutputs: GitExecOutput;
 
   beforeEach((): void => {

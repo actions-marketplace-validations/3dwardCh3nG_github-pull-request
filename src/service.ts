@@ -8,7 +8,7 @@ import {
   IRemoteDetail,
   IWorkingBaseAndType
 } from './git-command-manager';
-import { createAuthHelper, IGitAuthHelper } from './git-auth-helper';
+import { GitAuthHelper, IGitAuthHelper } from './git-auth-helper';
 import { GitSourceSettings, IGitSourceSettings } from './git-source-settings';
 import { GithubClient, IGithubClient, Pull } from './github-client';
 import { v4 as uuidv4 } from 'uuid';
@@ -269,7 +269,7 @@ class Service implements IService {
       this.inputs.SOURCE_BRANCH_NAME,
       this.inputs.TARGET_BRANCH_NAME
     );
-    const gitAuthHelper: IGitAuthHelper = createAuthHelper(
+    const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
       git,
       gitSourceSettings
     );

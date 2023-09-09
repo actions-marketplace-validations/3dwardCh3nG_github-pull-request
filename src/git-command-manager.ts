@@ -69,6 +69,8 @@ export interface IGitCommandManager {
 
   unsetConfig(configKey: string, globalConfig?: boolean): Promise<boolean>;
 
+  getGitDirectory(): Promise<string>;
+
   getWorkingDirectory(): string;
 }
 
@@ -335,6 +337,10 @@ export class GitCommandManager implements IGitCommandManager {
       true
     );
     return output.exitCode === 0;
+  }
+
+  getGitDirectory(): Promise<string> {
+    return this.revParse('--git-dir');
   }
 
   getWorkingDirectory(): string {
