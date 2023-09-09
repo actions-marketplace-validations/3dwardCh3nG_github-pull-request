@@ -72,6 +72,10 @@ export interface IGitCommandManager {
   getGitDirectory(): Promise<string>;
 
   getWorkingDirectory(): string;
+
+  setEnvironmentVariable(name: string, value: string): void;
+
+  removeEnvironmentVariable(name: string): void;
 }
 
 export async function createGitCommandManager(
@@ -84,6 +88,10 @@ export class GitCommandManager implements IGitCommandManager {
   private readonly workflowUtils: IWorkflowUtils;
   private gitPath = '';
   private workingDirectory = '';
+  private gitEnv: { [p: string]: string } = {
+    GIT_TERMINAL_PROMPT: '0', // Disable git prompt
+    GCM_INTERACTIVE: 'Never' // Disable prompting for git credential manager
+  };
 
   private constructor() {
     this.workflowUtils = new WorkflowUtils();
@@ -339,7 +347,7 @@ export class GitCommandManager implements IGitCommandManager {
     return output.exitCode === 0;
   }
 
-  getGitDirectory(): Promise<string> {
+  async getGitDirectory(): Promise<string> {
     return this.revParse('--git-dir');
   }
 
@@ -373,7 +381,7 @@ export class GitCommandManager implements IGitCommandManager {
   ): Promise<GitExecOutput> {
     const output: GitExecOutput = new GitExecOutput();
 
-    const env: { [p: string]: string } = this.getProcessEnv();
+    const env: { [p: string]: string } = this.getEnvs();
 
     const execOptions: exec.ExecOptions = {
       cwd: this.workingDirectory,
@@ -399,10 +407,13 @@ export class GitCommandManager implements IGitCommandManager {
     return output;
   }
 
-  private getProcessEnv(): { [key: string]: string } {
+  private getEnvs(): { [key: string]: string } {
     const env: { [key: string]: string } = {};
     for (const key of Object.keys(process.env)) {
       env[key] = process.env[key] || '';
+    }
+    for (const key of Object.keys(this.gitEnv)) {
+      env[key] = this.gitEnv[key];
     }
     return env;
   }
@@ -446,5 +457,13 @@ export class GitCommandManager implements IGitCommandManager {
     throw new Error(
       `The format of '${githubUrl}' is not a valid GitHub repository URL`
     );
+  }
+
+  setEnvironmentVariable(name: string, value: string): void {
+    this.gitEnv[name] = value;
+  }
+
+  removeEnvironmentVariable(name: string): void {
+    delete this.gitEnv[name];
   }
 }

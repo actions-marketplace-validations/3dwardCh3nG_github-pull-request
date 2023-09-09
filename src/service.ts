@@ -267,7 +267,12 @@ class Service implements IService {
       this.inputs.REPO_OWNER,
       this.inputs.REPO_NAME,
       this.inputs.SOURCE_BRANCH_NAME,
-      this.inputs.TARGET_BRANCH_NAME
+      this.inputs.TARGET_BRANCH_NAME,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined
     );
     const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
       git,
