@@ -13581,83 +13581,221 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createAuthHelper = void 0;
-const core = __importStar(__nccwpck_require__(2186));
-const constants_1 = __nccwpck_require__(9042);
-const path = __importStar(__nccwpck_require__(1017));
+exports.GitAuthHelper = exports.createAuthHelper = void 0;
 const assert = __importStar(__nccwpck_require__(9491));
+const core = __importStar(__nccwpck_require__(2186));
+const exec = __importStar(__nccwpck_require__(1514));
 const fs = __importStar(__nccwpck_require__(7147));
-const message_1 = __nccwpck_require__(7899);
+const io = __importStar(__nccwpck_require__(7436));
+const os = __importStar(__nccwpck_require__(2037));
+const path = __importStar(__nccwpck_require__(1017));
+const url_1 = __nccwpck_require__(7310);
+const core_1 = __nccwpck_require__(2186);
+const uuid_1 = __nccwpck_require__(5840);
+const constants_1 = __nccwpck_require__(9042);
+const IS_WINDOWS = process.platform === 'win32';
+const SSH_COMMAND_KEY = 'core.sshCommand';
 function createAuthHelper(git, settings) {
     return new GitAuthHelper(git, settings);
 }
 exports.createAuthHelper = createAuthHelper;
 class GitAuthHelper {
-    git;
-    settings;
-    tokenConfigKey = '';
-    tokenConfigValue = '';
-    constructor(git, settings) {
-        this.git = git;
-        this.settings = settings || {};
-        this.init();
+    _git;
+    _settings;
+    _tokenConfigKey;
+    _tokenConfigValue;
+    _insteadOfKey;
+    _insteadOfValues = [];
+    _sshCommand = '';
+    _sshKeyPath = '';
+    _sshKnownHostsPath = '';
+    constructor(gitCommandManager, gitSourceSettings) {
+        this._git = gitCommandManager;
+        this._settings = gitSourceSettings;
+        // Token auth header
+        const serverUrl = this.getServerUrl(this._settings.githubServerUrl);
+        this._tokenConfigKey = `http.${serverUrl.origin}/.extraheader`; // "origin" is SCHEME://HOSTNAME[:PORT]
+        const basicCredential = Buffer.from(`x-access-token:${this._settings.authToken}`, 'utf8').toString('base64');
+        core.setSecret(basicCredential);
+        this._tokenConfigValue = `AUTHORIZATION: basic ${basicCredential}`;
+        // Instead of SSH URL
+        this._insteadOfKey = `url.${serverUrl.origin}/.insteadOf`; // "origin" is SCHEME://HOSTNAME[:PORT]
+        this._insteadOfValues.push(`git@${serverUrl.hostname}:`);
+        if (this._settings.workflowOrganizationId) {
+            this._insteadOfValues.push(`org-${this._settings.workflowOrganizationId}@github.com:`);
+        }
     }
     async configureAuth() {
+        // Remove possible previous values
         await this.removeAuth();
+        // Configure new values
+        await this.configureSsh();
         await this.configureToken();
     }
     async removeAuth() {
+        await this.removeSsh();
         await this.removeToken();
     }
-    init() {
-        const serverUrl = this.getServerUrl(this.settings.getGithubServerUrl());
-        this.tokenConfigKey = `http.${serverUrl.origin}/.extraheader`;
-        const basicCredential = Buffer.from(`x-access-token:${this.settings.getAuthToken()}`, 'utf8').toString('base64');
-        core.setSecret(basicCredential);
-        this.tokenConfigValue = `AUTHORIZATION: basic ${basicCredential}`;
-    }
-    getServerUrl(url) {
-        const urlValue = url && url.trim().length > 0
-            ? url
-            : process.env['GITHUB_SERVER_URL'] || 'https://github.com';
-        return new URL(urlValue);
-    }
-    async removeToken() {
-        // HTTP extra header
-        await this.removeGitConfig(this.tokenConfigKey);
+    async configureSsh() {
+        if (!this._settings.sshKey) {
+            return;
+        }
+        // Write key
+        const runnerTemp = process.env['RUNNER_TEMP'] || '';
+        assert.ok(runnerTemp, 'RUNNER_TEMP is not defined');
+        const uniqueId = (0, uuid_1.v4)();
+        this._sshKeyPath = path.join(runnerTemp, uniqueId);
+        this.setState('sshKeyPath', this._sshKeyPath);
+        await fs.promises.mkdir(runnerTemp, { recursive: true });
+        await fs.promises.writeFile(this._sshKeyPath, `${this._settings.sshKey.trim()}\n`, { mode: 0o600 });
+        // Remove inherited permissions on Windows
+        if (IS_WINDOWS) {
+            const icacls = await io.which('icacls.exe');
+            await exec.exec(`"${icacls}" "${this._sshKeyPath}" /grant:r "${process.env['USERDOMAIN']}\\${process.env['USERNAME']}:F"`);
+            await exec.exec(`"${icacls}" "${this._sshKeyPath}" /inheritance:r`);
+        }
+        // Write known hosts
+        const userKnownHostsPath = path.join(os.homedir(), '.ssh', 'known_hosts');
+        let userKnownHosts = '';
+        try {
+            userKnownHosts = (await fs.promises.readFile(userKnownHostsPath)).toString();
+        }
+        catch (err) {
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            if (err?.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+        let knownHosts = '';
+        if (userKnownHosts) {
+            knownHosts += `# Begin from ${userKnownHostsPath}\n${userKnownHosts}\n# End from ${userKnownHostsPath}\n`;
+        }
+        if (this._settings.sshKnownHosts) {
+            knownHosts += `# Begin from input known hosts\n${this._settings.sshKnownHosts}\n# end from input known hosts\n`;
+        }
+        knownHosts += `# Begin implicitly added github.com\ngithub.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=\n# End implicitly added github.com\n`;
+        this._sshKnownHostsPath = path.join(runnerTemp, `${uniqueId}_known_hosts`);
+        this.setState('sshKnownHostsPath', this._sshKnownHostsPath);
+        await fs.promises.writeFile(this._sshKnownHostsPath, knownHosts);
+        // Configure GIT_SSH_COMMAND
+        const sshPath = await io.which('ssh', true);
+        this._sshCommand = `"${sshPath}" -i "$RUNNER_TEMP/${path.basename(this._sshKeyPath)}"`;
+        if (this._settings.sshStrict) {
+            this._sshCommand += ' -o StrictHostKeyChecking=yes -o CheckHostIP=no';
+        }
+        this._sshCommand += ` -o "UserKnownHostsFile=$RUNNER_TEMP/${path.basename(this._sshKnownHostsPath)}"`;
+        core.info(`Temporarily overriding GIT_SSH_COMMAND=${this._sshCommand}`);
+        this._git.setEnvironmentVariable('GIT_SSH_COMMAND', this._sshCommand);
+        // Configure core.sshCommand
+        if (this._settings.persistCredentials) {
+            await this._git.config(SSH_COMMAND_KEY, this._sshCommand);
+        }
     }
     async configureToken(configPath, globalConfig) {
+        // Validate args
         assert.ok((configPath && globalConfig) || (!configPath && !globalConfig), 'Unexpected configureToken parameter combinations');
+        // Default config path
         if (!configPath && !globalConfig) {
-            configPath = path.join(this.git.getWorkingDirectory(), '.git', 'config');
+            configPath = path.join(this._git.getWorkingDirectory(), '.git', 'config');
         }
         // Configure a placeholder value. This approach avoids the credential being captured
         // by process creation audit events, which are commonly logged. For more information,
         // refer to https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/manage/component-updates/command-line-process-auditing
-        await this.git.config(this.tokenConfigKey, constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, globalConfig);
+        await this._git.config(this._tokenConfigKey, constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, globalConfig);
         // Replace the placeholder
         await this.replaceTokenPlaceholder(configPath || '');
     }
-    async removeGitConfig(configKey) {
-        if ((await this.git.configExists(configKey)) &&
-            !(await this.git.unsetConfig(configKey))) {
-            core.warning(`Failed to remove '${configKey}' from the git config`);
-        }
-    }
     async replaceTokenPlaceholder(configPath) {
-        assert.ok(configPath, message_1.ErrorMessages.CONFIG_PATH_IS_NOT_DEFINED);
+        assert.ok(configPath, 'configPath is not defined');
         let content = (await fs.promises.readFile(configPath)).toString();
         const placeholderIndex = content.indexOf(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE);
         if (placeholderIndex < 0 ||
             placeholderIndex !==
                 content.lastIndexOf(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE)) {
-            throw new Error(message_1.ErrorMessages.UNABLE_TO_REPLACE_AUTH_PLACEHOLDER + configPath);
+            throw new Error(`Unable to replace auth placeholder in ${configPath}`);
         }
-        assert.ok(this.tokenConfigValue, message_1.ErrorMessages.TOKEN_CONFIG_VALUE_IS_NOT_DEFINED);
-        content = content.replace(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, this.tokenConfigValue);
+        assert.ok(this._tokenConfigValue, 'tokenConfigValue is not defined');
+        content = content.replace(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, this._tokenConfigValue);
         await fs.promises.writeFile(configPath, content);
     }
+    async removeSsh() {
+        // SSH key
+        const keyPath = this._sshKeyPath || (0, core_1.getState)('sshKeyPath');
+        if (keyPath) {
+            try {
+                await io.rmRF(keyPath);
+            }
+            catch (err) {
+                /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+                core.debug(`${err?.message ?? err}`);
+                core.warning(`Failed to remove SSH key '${keyPath}'`);
+            }
+        }
+        // SSH known hosts
+        const knownHostsPath = this._sshKnownHostsPath || (0, core_1.getState)('sshKnownHostsPath');
+        if (knownHostsPath) {
+            try {
+                await io.rmRF(knownHostsPath);
+            }
+            catch {
+                // Intentionally empty
+            }
+        }
+        // SSH command
+        await this.removeGitConfig(SSH_COMMAND_KEY);
+    }
+    async removeToken() {
+        // HTTP extra header
+        await this.removeGitConfig(this._tokenConfigKey);
+    }
+    async removeGitConfig(configKey) {
+        if ((await this._git.configExists(configKey)) &&
+            !(await this._git.unsetConfig(configKey))) {
+            // Load the config contents
+            core.warning(`Failed to remove '${configKey}' from the git config`);
+        }
+    }
+    setState(key, value) {
+        core.saveState(key, value);
+    }
+    getState(key) {
+        return core.getState(key);
+    }
+    getServerUrl(url) {
+        const urlValue = url && url.trim().length > 0
+            ? url
+            : process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+        return new url_1.URL(urlValue);
+    }
+    get git() {
+        return this._git;
+    }
+    get settings() {
+        return this._settings;
+    }
+    get tokenConfigKey() {
+        return this._tokenConfigKey;
+    }
+    get tokenConfigValue() {
+        return this._tokenConfigValue;
+    }
+    get insteadOfKey() {
+        return this._insteadOfKey;
+    }
+    get insteadOfValues() {
+        return this._insteadOfValues;
+    }
+    get sshCommand() {
+        return this._sshCommand;
+    }
+    get sshKeyPath() {
+        return this._sshKeyPath;
+    }
+    get sshKnownHostsPath() {
+        return this._sshKnownHostsPath;
+    }
 }
+exports.GitAuthHelper = GitAuthHelper;
 
 
 /***/ }),
@@ -13711,6 +13849,10 @@ class GitCommandManager {
     workflowUtils;
     gitPath = '';
     workingDirectory = '';
+    gitEnv = {
+        GIT_TERMINAL_PROMPT: '0',
+        GCM_INTERACTIVE: 'Never' // Disable prompting for git credential manager
+    };
     constructor() {
         this.workflowUtils = new workflow_utils_1.WorkflowUtils();
     }
@@ -13729,7 +13871,7 @@ class GitCommandManager {
     }
     async getWorkingBaseAndType() {
         const symbolicRefResult = await this.execGit(['symbolic-ref', 'HEAD', '--short'], true);
-        if (symbolicRefResult.getExitCode() === 0) {
+        if (symbolicRefResult.exitCode === 0) {
             // ref
             return {
                 workingBase: symbolicRefResult.getStdout(),
@@ -13867,7 +14009,7 @@ class GitCommandManager {
             args.push(...options);
         }
         const output = await this.execGit(args, true);
-        return output.getExitCode() === 1;
+        return output.exitCode === 1;
     }
     async config(configKey, configValue, globalConfig, add) {
         const args = ['config', globalConfig ? '--global' : '--local'];
@@ -13885,7 +14027,7 @@ class GitCommandManager {
             '--get-regexp',
             configKey
         ], true);
-        return output.getExitCode() === 0;
+        return output.exitCode === 0;
     }
     async unsetConfig(configKey, globalConfig) {
         const output = await this.execGit([
@@ -13894,7 +14036,10 @@ class GitCommandManager {
             '--unset-all',
             configKey
         ], true);
-        return output.getExitCode() === 0;
+        return output.exitCode === 0;
+    }
+    async getGitDirectory() {
+        return this.revParse('--git-dir');
     }
     getWorkingDirectory() {
         return this.workingDirectory;
@@ -13915,7 +14060,7 @@ class GitCommandManager {
     }
     async execGit(args, ignoreReturnCode = false, silent = false) {
         const output = new git_exec_output_1.GitExecOutput();
-        const env = this.getProcessEnv();
+        const env = this.getEnvs();
         const execOptions = {
             cwd: this.workingDirectory,
             env,
@@ -13934,13 +14079,16 @@ class GitCommandManager {
             }
         };
         const exitCode = await exec.exec(this.gitPath, args, execOptions);
-        output.setExitCode(exitCode);
+        output.exitCode = exitCode;
         return output;
     }
-    getProcessEnv() {
+    getEnvs() {
         const env = {};
         for (const key of Object.keys(process.env)) {
             env[key] = process.env[key] || '';
+        }
+        for (const key of Object.keys(this.gitEnv)) {
+            env[key] = this.gitEnv[key];
         }
         return env;
     }
@@ -13972,6 +14120,12 @@ class GitCommandManager {
         }
         throw new Error(`The format of '${githubUrl}' is not a valid GitHub repository URL`);
     }
+    setEnvironmentVariable(name, value) {
+        this.gitEnv[name] = value;
+    }
+    removeEnvironmentVariable(name) {
+        delete this.gitEnv[name];
+    }
 }
 exports.GitCommandManager = GitCommandManager;
 
@@ -13986,39 +14140,57 @@ exports.GitCommandManager = GitCommandManager;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GitExecOutput = void 0;
 class GitExecOutput {
-    exitCode;
-    stdout;
-    stderr;
-    debug;
+    _exitCode;
+    _stdout;
+    _stderr;
+    _debug;
     constructor() {
-        this.exitCode = 0;
-        this.stdout = [];
-        this.stderr = [];
-        this.debug = [];
+        this._exitCode = 0;
+        this._stdout = [];
+        this._stderr = [];
+        this._debug = [];
     }
-    setExitCode(exitCode) {
-        this.exitCode = exitCode;
+    get exitCode() {
+        return this._exitCode;
     }
-    getExitCode() {
-        return this.exitCode;
+    set exitCode(value) {
+        this._exitCode = value;
+    }
+    get stdout() {
+        return this._stdout;
+    }
+    set stdout(value) {
+        this._stdout = value;
+    }
+    get stderr() {
+        return this._stderr;
+    }
+    set stderr(value) {
+        this._stderr = value;
+    }
+    get debug() {
+        return this._debug;
+    }
+    set debug(value) {
+        this._debug = value;
     }
     addStdoutLine(line) {
-        this.stdout.push(line);
+        this._stdout.push(line);
     }
     getStdout() {
-        return this.stdout.join('\n');
+        return this._stdout.join('\n');
     }
     addStderrLine(line) {
-        this.stderr.push(line);
+        this._stderr.push(line);
     }
     getStderr() {
-        return this.stderr.join('\n');
+        return this._stderr.join('\n');
     }
     addDebugLine(line) {
-        this.debug.push(line);
+        this._debug.push(line);
     }
     getDebug() {
-        return this.debug.join('\n');
+        return this._debug.join('\n');
     }
 }
 exports.GitExecOutput = GitExecOutput;
@@ -14032,40 +14204,62 @@ exports.GitExecOutput = GitExecOutput;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createSourceSettings = void 0;
-function createSourceSettings(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl) {
-    return new GitSourceSettings(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl);
-}
-exports.createSourceSettings = createSourceSettings;
+exports.GitSourceSettings = void 0;
 class GitSourceSettings {
-    repositoryPath;
-    repositoryOwner;
-    repositoryName;
-    authToken;
-    githubServerUrl;
-    constructor(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl) {
-        this.repositoryPath = repositoryPath;
-        this.repositoryOwner = repositoryOwner;
-        this.repositoryName = repositoryName;
-        this.authToken = authToken;
-        this.githubServerUrl = githubServerUrl;
+    _repositoryPath;
+    _repositoryOwner;
+    _repositoryName;
+    _authToken;
+    _githubServerUrl;
+    _workflowOrganizationId;
+    _sshKey;
+    _sshKnownHosts;
+    _sshStrict;
+    _persistCredentials;
+    constructor(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl, workflowOrganizationId, sshKey, sshKnownHosts, sshStrict, persistCredentials) {
+        this._repositoryPath = repositoryPath;
+        this._repositoryOwner = repositoryOwner;
+        this._repositoryName = repositoryName;
+        this._authToken = authToken;
+        this._githubServerUrl = githubServerUrl;
+        this._workflowOrganizationId = workflowOrganizationId;
+        this._sshKey = sshKey;
+        this._sshKnownHosts = sshKnownHosts;
+        this._sshStrict = sshStrict;
+        this._persistCredentials = persistCredentials;
     }
-    getRepositoryPath() {
-        return this.repositoryPath;
+    get repositoryPath() {
+        return this._repositoryPath;
     }
-    getRepositoryOwner() {
-        return this.repositoryOwner;
+    get repositoryOwner() {
+        return this._repositoryOwner;
     }
-    getRepositoryName() {
-        return this.repositoryName;
+    get repositoryName() {
+        return this._repositoryName;
     }
-    getAuthToken() {
-        return this.authToken;
+    get authToken() {
+        return this._authToken;
     }
-    getGithubServerUrl() {
-        return this.githubServerUrl;
+    get githubServerUrl() {
+        return this._githubServerUrl;
+    }
+    get workflowOrganizationId() {
+        return this._workflowOrganizationId;
+    }
+    get sshKey() {
+        return this._sshKey;
+    }
+    get sshKnownHosts() {
+        return this._sshKnownHosts;
+    }
+    get sshStrict() {
+        return this._sshStrict;
+    }
+    get persistCredentials() {
+        return this._persistCredentials;
     }
 }
+exports.GitSourceSettings = GitSourceSettings;
 
 
 /***/ }),
@@ -14099,16 +14293,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createGithubClient = void 0;
+exports.GithubClient = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const core_1 = __nccwpck_require__(6762);
 const plugin_rest_endpoint_methods_1 = __nccwpck_require__(3044);
 const workflow_utils_1 = __nccwpck_require__(5540);
-const ERROR_PR_REVIEW_TOKEN_SCOPE = 'Validation Failed: "Could not resolve to a node with the global id of';
-function createGithubClient(githubToken) {
-    return new GithubClient(githubToken);
-}
-exports.createGithubClient = createGithubClient;
+const process = __importStar(__nccwpck_require__(7282));
+const message_1 = __nccwpck_require__(7899);
 class GithubClient {
     workflowUtils;
     octokit;
@@ -14131,7 +14322,7 @@ class GithubClient {
     async createOrUpdatePullRequest(inputs, result) {
         const repoOwner = inputs.REPO_OWNER;
         const repoName = inputs.REPO_NAME;
-        const repoBranch = `${repoOwner}:${result.targetBranch}`;
+        const repoBranch = `${repoOwner}:${result.sourceBranch}`;
         const headBranchFull = `${repoOwner}/${repoName}:${repoBranch}`;
         try {
             core.info(`Trying to create the Pull Request`);
@@ -14239,8 +14430,8 @@ class GithubClient {
             catch (e) {
                 if (this.workflowUtils
                     .getErrorMessage(e)
-                    .includes(ERROR_PR_REVIEW_TOKEN_SCOPE)) {
-                    core.error(`Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required.`);
+                    .includes(message_1.ErrorMessages.ERROR_PR_REVIEW_TOKEN_SCOPE)) {
+                    core.error(message_1.ErrorMessages.UPDATE_REVIEWER_ERROR);
                 }
                 throw e;
             }
@@ -14267,6 +14458,7 @@ class GithubClient {
         });
     }
 }
+exports.GithubClient = GithubClient;
 
 
 /***/ }),
@@ -14455,7 +14647,11 @@ exports.ErrorMessages = {
     RETRY_HELPER_MIN_SECONDS_MAX_SECONDS_ERROR: 'The minSeconds should be less than or equal to the maxSeconds',
     BRANCH_NAME_SAME_ERROR: 'The source_branch and the target_branch for a pull request must be different branches. Unable to continue.',
     TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS: 'When in the detached HEAD state, the target_branch input must be supplied.',
-    TARGET_BRANCH_IS_NOT_SUPPLIED: 'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.'
+    TARGET_BRANCH_IS_NOT_SUPPLIED: 'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.',
+    FILE_EXISTS_CHECK_ERROR: 'Encountered an error when checking whether path exists: ',
+    FILE_EXISTS_CHECK_INPUT_ERROR: 'Arg "filePath" must not be empty',
+    ERROR_PR_REVIEW_TOKEN_SCOPE: 'Validation Failed: Could not resolve to a node with the global id of',
+    UPDATE_REVIEWER_ERROR: "Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required."
 };
 
 
@@ -14635,9 +14831,11 @@ exports.createService = createService;
 class Service {
     inputs;
     workflowUtils;
+    githubClient;
     constructor(inputs) {
         this.inputs = inputs;
         this.workflowUtils = new workflow_utils_1.WorkflowUtils();
+        this.githubClient = new github_client_1.GithubClient(this.inputs.GITHUB_TOKEN);
         this.inputDataChecks();
     }
     async createPullRequest() {
@@ -14659,8 +14857,7 @@ class Service {
             await this.pushPullRequestBranch(git, result);
             if (result.hasDiffWithTargetBranch) {
                 core.startGroup('Create or update the pull request');
-                const githubClient = (0, github_client_1.createGithubClient)(this.inputs.GITHUB_TOKEN);
-                pullRequest = await githubClient.preparePullRequest(this.inputs, result);
+                pullRequest = await this.githubClient.preparePullRequest(this.inputs, result);
                 core.endGroup();
             }
         }
@@ -14675,7 +14872,6 @@ class Service {
     async mergePullRequestWithRetries(pullRequest) {
         const response = await this.prepareGitAuthentication();
         const gitAuthHelper = response.gitAuthHelper;
-        const githubClient = (0, github_client_1.createGithubClient)(this.inputs.GITHUB_TOKEN);
         let pr = {
             number: pullRequest.number,
             html_url: pullRequest.html_url,
@@ -14683,22 +14879,22 @@ class Service {
             merged: pullRequest.merged
         };
         try {
-            pr = await this.mergePullRequest(githubClient, pr);
+            pr = await this.mergePullRequest(pr);
         }
         catch (error) {
             const maxRetries = this.inputs.MAX_MERGE_RETRIES;
             const retryInterval = this.inputs.MERGE_RETRY_INTERVAL;
-            pr = await (0, retry_helper_wrapper_1.executeWithCustomised)(maxRetries, undefined, undefined, retryInterval, async () => await this.mergePullRequest(githubClient, pr));
+            pr = await (0, retry_helper_wrapper_1.executeWithCustomised)(maxRetries, undefined, undefined, retryInterval, async () => await this.mergePullRequest(pr));
         }
         finally {
             await gitAuthHelper.removeAuth();
         }
         return pr;
     }
-    async mergePullRequest(githubClient, pullRequest) {
+    async mergePullRequest(pullRequest) {
         try {
             core.startGroup(`Merging pull request #${pullRequest.number}`);
-            pullRequest = await githubClient.mergePullRequest(pullRequest, this.inputs);
+            pullRequest = await this.githubClient.mergePullRequest(pullRequest, this.inputs);
             core.endGroup();
         }
         catch (error) {
@@ -14788,8 +14984,8 @@ class Service {
     async prepareGitAuthentication() {
         const repoPath = this.workflowUtils.getRepoPath();
         const git = await (0, git_command_manager_1.createGitCommandManager)(repoPath);
-        const gitSourceSettings = (0, git_source_settings_1.createSourceSettings)(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.SOURCE_BRANCH_NAME, this.inputs.TARGET_BRANCH_NAME);
-        const gitAuthHelper = (0, git_auth_helper_1.createAuthHelper)(git, gitSourceSettings);
+        const gitSourceSettings = new git_source_settings_1.GitSourceSettings(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.SOURCE_BRANCH_NAME, this.inputs.TARGET_BRANCH_NAME, undefined, undefined, undefined, undefined, undefined);
+        const gitAuthHelper = new git_auth_helper_1.GitAuthHelper(git, gitSourceSettings);
         const remoteUrl = await git.getRepoRemoteUrl();
         const remoteDetail = git.getRemoteDetail(remoteUrl);
         core.info(message_1.InfoMessages.PR_TARGET_REPO + remoteDetail.repository);
@@ -14881,7 +15077,7 @@ class WorkflowUtils {
     }
     fileExistsSync(filePath) {
         if (!filePath) {
-            throw new Error("Arg 'filePath' must not be empty");
+            throw new Error(message_1.ErrorMessages.FILE_EXISTS_CHECK_INPUT_ERROR);
         }
         let stats;
         try {
@@ -14892,7 +15088,7 @@ class WorkflowUtils {
                 error.code === 'ENOENT') {
                 return false;
             }
-            throw new Error(`Encountered an error when checking whether path '${path}' exists: ${this.getErrorMessage(error)}`);
+            throw new Error(message_1.ErrorMessages.FILE_EXISTS_CHECK_ERROR + this.getErrorMessage(error));
         }
         return !stats.isDirectory();
     }
@@ -14995,6 +15191,14 @@ module.exports = require("os");
 
 "use strict";
 module.exports = require("path");
+
+/***/ }),
+
+/***/ 7282:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("process");
 
 /***/ }),
 

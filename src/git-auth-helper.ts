@@ -29,13 +29,6 @@ export interface IGitAuthHelper {
   removeAuth(): Promise<void>;
 }
 
-export function createAuthHelper(
-  git: IGitCommandManager,
-  settings: IGitSourceSettings
-): IGitAuthHelper {
-  return new GitAuthHelper(git, settings);
-}
-
 export class GitAuthHelper implements IGitAuthHelper {
   private readonly _git: IGitCommandManager;
   private readonly _settings: IGitSourceSettings;
@@ -189,7 +182,7 @@ export class GitAuthHelper implements IGitAuthHelper {
     );
 
     // Replace the placeholder
-    await this.replaceTokenPlaceholder(configPath || '');
+    await this.replaceTokenPlaceholder(configPath ?? '');
   }
 
   private async replaceTokenPlaceholder(configPath: string): Promise<void> {
@@ -268,7 +261,7 @@ export class GitAuthHelper implements IGitAuthHelper {
     const urlValue: string =
       url && url.trim().length > 0
         ? url
-        : process.env['GITHUB_SERVER_URL'] || 'https://github.com';
+        : process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
     return new URL(urlValue);
   }
 
