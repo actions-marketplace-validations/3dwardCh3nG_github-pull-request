@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import * as io from '@actions/io';
+import * as exec from '@actions/exec';
 import {
   createGitCommandManager,
   GitCommandManager,
@@ -10,14 +11,11 @@ import {
   IGitSourceSettings
 } from '../src/git-source-settings';
 import { GitAuthHelper, IGitAuthHelper } from '../src/git-auth-helper';
-import { v4 as uuidv4, V4Options } from 'uuid';
-import * as NodePromisesModule from 'node:fs/promises';
 import * as assert from 'assert';
 import * as os from 'os';
-import * as process from 'node:process';
 import path from 'path';
 import { PathLike } from 'fs';
-import { FileHandle } from 'fs/promises';
+import promises, { FileHandle } from 'fs/promises';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const repositoryPath: string = 'repositoryPath';
@@ -37,12 +35,18 @@ const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
   false
 );
 
-const infoMock: jest.SpyInstance<void, [message: string]> = jest.spyOn(
+const infoSpy: jest.SpyInstance<void, [message: string]> = jest.spyOn(
   core,
   'info'
 );
+const debugSpy: jest.SpyInstance<void, [message: string]> = jest.spyOn(
+  core,
+  'debug'
+);
+const warningSpy: jest.SpyInstance<void> = jest.spyOn(core, 'warning');
 const setSecretSpy: jest.SpyInstance<any, any> = jest.spyOn(core, 'setSecret');
 const saveStateSpy: jest.SpyInstance<any, any> = jest.spyOn(core, 'saveState');
+const getStateSpy: jest.SpyInstance<any, any> = jest.spyOn(core, 'getState');
 const configExistsMock: jest.Mock<any, any, any> = jest
   .fn()
   .mockImplementation(async (): Promise<boolean> => {
@@ -100,28 +104,28 @@ const gitConfigContent: string = `[core]
   \tremote = origin
   \tmerge = refs/heads/main`;
 const buffer: Buffer = Buffer.from(gitConfigContent);
-jest.mock('fs', () => {
+jest.mock('fs/promises', () => {
   return {
-    ...jest.requireActual('fs'),
-    promises: {
-      ...jest.requireActual('fs/promises'),
-      readFile: jest
-        .fn()
-        .mockImplementation(
-          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (path === '~/.git/config') {
-              return Promise.resolve(buffer);
-            } else if (path === '/home/runner/.ssh/known_hosts') {
-              return Promise.resolve('127.0.0.1');
-            }
-            return Promise.resolve('');
+    ...jest.requireActual('fs/promises'),
+    readFile: jest
+      .fn()
+      .mockImplementation(
+        async (path: PathLike | FileHandle): Promise<Buffer | string> => {
+          if (path === '~/.git/config') {
+            return Promise.resolve(buffer);
+          } else if (path === '/home/runner/.ssh/known_hosts') {
+            return Promise.resolve('127.0.0.1');
           }
-        ),
-      writeFile: jest.fn(),
-      mkdir: jest.fn()
-    }
-  } as typeof NodePromisesModule;
+          return Promise.resolve('');
+        }
+      ),
+    writeFile: jest.fn(),
+    mkdir: jest.fn()
+  };
 });
+const readFileSpy = jest.spyOn(promises, 'readFile');
+const writeFileSpy = jest.spyOn(promises, 'writeFile');
+const mkdirSpy = jest.spyOn(promises, 'mkdir');
 jest.mock('assert', () => {
   return {
     ...jest.requireActual('assert'),
@@ -136,14 +140,6 @@ jest.mock('@actions/io', () => {
   };
 });
 jest.mock('os');
-jest.mock('node:process', () => {
-  return {
-    ...jest.requireActual('node:process'),
-    platform: jest.fn().mockImplementation((): string => {
-      return 'linux';
-    })
-  };
-});
 jest.mock('path', () => {
   return {
     ...jest.requireActual('path'),
@@ -189,17 +185,17 @@ describe('Test git-auth-helper.ts', (): void => {
   });
 
   describe('Test configureAuth function', (): void => {
+    let whichMock: jest.SpyInstance;
+    let pathJoinMock: jest.SpyInstance;
+    let assertOkSpy: jest.SpyInstance<any, any>;
+
     const pathJoinFuncMock = function (...paths: string[]): string {
       return paths.join('/');
     };
-    const pathJoinMock = jest
-      .spyOn(path, 'join')
-      .mockImplementation(pathJoinFuncMock);
-    let assertOkSpy: jest.SpyInstance<any, any> = jest.spyOn(assert, 'ok');
 
-    beforeAll((): void => {
+    beforeEach((): void => {
       jest.spyOn(io, 'rmRF').mockImplementation(async (): Promise<void> => {});
-      jest
+      whichMock = jest
         .spyOn(io, 'which')
         .mockImplementation(
           async (tool: string, check?: boolean): Promise<string> => {
@@ -207,11 +203,21 @@ describe('Test git-auth-helper.ts', (): void => {
               return Promise.resolve('/usr/bin/ssh');
             } else if (tool === 'git' && check) {
               return Promise.resolve('/usr/bin/git');
+            } else if (tool === 'icacls.exe' && check === undefined) {
+              return Promise.resolve('C:\\Windows\\System32\\icacls.exe');
             }
             return Promise.resolve('');
           }
         );
       jest.spyOn(os, 'homedir').mockReturnValue('/home/runner');
+      pathJoinMock = jest
+        .spyOn(path, 'join')
+        .mockImplementation(pathJoinFuncMock);
+      assertOkSpy = jest.spyOn(assert, 'ok');
+    });
+
+    afterEach((): void => {
+      jest.resetModules();
     });
 
     it('should call removeToken and configureToken and success', async (): Promise<void> => {
@@ -291,7 +297,6 @@ describe('Test git-auth-helper.ts', (): void => {
       sshCommand += ` -o "UserKnownHostsFile=$RUNNER_TEMP/${sshKnownHostsPathBaseName}"`;
 
       // removeAuth()
-      // expect(rmRFFuncMock).toHaveBeenCalledTimes(2);
       expect(configExistsMock).toHaveBeenCalledTimes(2);
       expect(configExistsMock).toHaveBeenCalledWith('core.sshCommand');
       expect(configExistsMock).toHaveBeenCalledWith(
@@ -339,8 +344,8 @@ describe('Test git-auth-helper.ts', (): void => {
         sshKnownHostsPath
       );
       expect(gitAuthHelper.sshKnownHostsPath).toEqual(sshKnownHostsPath);
-      expect(infoMock).toHaveBeenCalledTimes(1);
-      expect(infoMock).toHaveBeenCalledWith(
+      expect(infoSpy).toHaveBeenCalledTimes(1);
+      expect(infoSpy).toHaveBeenCalledWith(
         `Temporarily overriding GIT_SSH_COMMAND=${sshCommand}`
       );
       expect(setEnvironmentVariableMock).toHaveBeenCalledTimes(1);
@@ -356,6 +361,290 @@ describe('Test git-auth-helper.ts', (): void => {
         undefined
       );
       // configureToken()
+    });
+
+    it('when IS_WINDOWS is true and success', async (): Promise<void> => {
+      process.env['USERDOMAIN'] = 'userdomain';
+      process.env['USERNAME'] = 'username';
+      const rmRFMock = jest
+        .spyOn(io, 'rmRF')
+        .mockImplementation(async (inputPath: string): Promise<void> => {
+          if (inputPath === '/tmp/sshKeyPath') {
+            throw new Error('Test remove ssh key error');
+          } else {
+            return Promise.resolve();
+          }
+        });
+      unsetConfigMock.mockImplementation(
+        async (configKey: string): Promise<boolean> => {
+          if (configKey === 'core.sshCommand') {
+            return Promise.resolve(false);
+          } else {
+            return Promise.resolve(true);
+          }
+        }
+      );
+      getStateSpy.mockImplementation((key: string): string => {
+        if (key === 'sshKnownHostsPath') {
+          return '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
+        }
+        return '';
+      });
+
+      const sshKey: string = 'sshKey';
+      const sshKnownHosts: string = 'sshKnownHosts';
+      const sshStrict: boolean = true;
+      const persistCredentials: boolean = true;
+      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
+        repositoryPath,
+        repositoryOwner,
+        repositoryName,
+        authToken,
+        undefined,
+        '1234567890',
+        sshKey,
+        sshKnownHosts,
+        sshStrict,
+        persistCredentials
+      );
+
+      const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
+        gitCommanderManager,
+        gitSourceSettings
+      );
+      jest
+        .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
+        .mockReturnValue('/tmp/sshKeyPath');
+      const execMock = jest
+        .spyOn(exec, 'exec')
+        .mockImplementation(async (commandLine: string): Promise<number> => {
+          return Promise.resolve(0);
+        });
+      jest.spyOn(gitAuthHelper, 'IS_WINDOWS', 'get').mockReturnValue(true);
+
+      await gitAuthHelper.configureAuth();
+
+      // removeSsh()
+      expect(rmRFMock).toHaveBeenCalledTimes(2);
+      expect(rmRFMock).toHaveBeenCalledWith('/tmp/sshKeyPath');
+      expect(rmRFMock).toHaveBeenCalledWith(
+        '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts'
+      );
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy).toHaveBeenCalledWith('Test remove ssh key error');
+      expect(warningSpy).toHaveBeenCalledTimes(2);
+      expect(warningSpy).toHaveBeenCalledWith(
+        "Failed to remove SSH key '/tmp/sshKeyPath'"
+      );
+      expect(warningSpy).toHaveBeenCalledWith(
+        "Failed to remove 'core.sshCommand' from the git config"
+      );
+      expect(getStateSpy).toHaveBeenCalledTimes(1);
+      expect(getStateSpy).toHaveBeenCalledWith('sshKnownHostsPath');
+      expect(whichMock).toHaveBeenCalledTimes(2);
+      expect(whichMock).toHaveBeenCalledWith('icacls.exe');
+      expect(whichMock).toHaveBeenCalledWith('ssh', true);
+      expect(execMock).toHaveBeenCalledTimes(2);
+      expect(execMock).toHaveBeenCalledWith(
+        '"C:\\Windows\\System32\\icacls.exe" "/tmp/sshKeyPath" /grant:r "userdomain\\username:F"'
+      );
+      expect(execMock).toHaveBeenCalledWith(
+        '"C:\\Windows\\System32\\icacls.exe" "/tmp/sshKeyPath" /inheritance:r'
+      );
+    });
+
+    it('when git config value is empty, Error should be thrown', async (): Promise<void> => {
+      jest
+        .spyOn(promises, 'readFile')
+        .mockImplementation(
+          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
+            if (path === '~/.git/config') {
+              return Promise.resolve('');
+            } else if (path === '/home/runner/.ssh/known_hosts') {
+              return Promise.resolve('127.0.0.1');
+            }
+            return Promise.resolve('');
+          }
+        );
+      unsetConfigMock.mockImplementation(
+        async (configKey: string): Promise<boolean> => {
+          return Promise.resolve(true);
+        }
+      );
+      getStateSpy.mockImplementation((key: string): string => {
+        if (key === 'sshKnownHostsPath') {
+          return '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
+        }
+        return '';
+      });
+      const rmRFMock = jest
+        .spyOn(io, 'rmRF')
+        .mockImplementation(async (inputPath: string): Promise<void> => {
+          if (inputPath === '/tmp/sshKeyPath') {
+            throw 'rmRF string error';
+          } else {
+            return Promise.resolve();
+          }
+        });
+
+      const sshKey: string = 'sshKey';
+      const sshKnownHosts: string = 'sshKnownHosts';
+      const sshStrict: boolean = true;
+      const persistCredentials: boolean = true;
+      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
+        repositoryPath,
+        repositoryOwner,
+        repositoryName,
+        authToken,
+        undefined,
+        '1234567890',
+        sshKey,
+        sshKnownHosts,
+        sshStrict,
+        persistCredentials
+      );
+
+      const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
+        gitCommanderManager,
+        gitSourceSettings
+      );
+      jest
+        .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
+        .mockReturnValue('/tmp/sshKeyPath');
+
+      await expect(gitAuthHelper.configureAuth()).rejects.toThrow(
+        new Error('Unable to replace auth placeholder in ~/.git/config')
+      );
+
+      expect(rmRFMock).toHaveBeenCalledTimes(2);
+      expect(configExistsMock).toHaveBeenCalledTimes(2);
+      expect(unsetConfigMock).toHaveBeenCalledTimes(2);
+      expect(warningSpy).toHaveBeenCalledTimes(1);
+      expect(mkdirSpy).toHaveBeenCalledTimes(1);
+      expect(writeFileSpy).toHaveBeenCalledTimes(2);
+      expect(readFileSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('when readFile of userKnownHostPath throw issue of ENOENT, Error should NOT be thrown', async (): Promise<void> => {
+      jest
+        .spyOn(promises, 'readFile')
+        .mockImplementation(
+          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
+            if (path === '~/.git/config') {
+              return Promise.resolve(buffer);
+            } else if (path === '/home/runner/.ssh/known_hosts') {
+              throw { code: 'ENOENT' };
+            }
+            return Promise.resolve('');
+          }
+        );
+      unsetConfigMock.mockImplementation(async (): Promise<boolean> => {
+        return Promise.resolve(true);
+      });
+      getStateSpy.mockImplementation((key: string): string => {
+        return '';
+      });
+      const rmRFMock = jest
+        .spyOn(io, 'rmRF')
+        .mockImplementation(async (inputPath: string): Promise<void> => {
+          return Promise.resolve();
+        });
+
+      const sshKey: string = 'sshKey';
+      const sshKnownHosts: string = 'sshKnownHosts';
+      const sshStrict: boolean = true;
+      const persistCredentials: boolean = true;
+      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
+        repositoryPath,
+        repositoryOwner,
+        repositoryName,
+        authToken,
+        undefined,
+        '1234567890',
+        sshKey,
+        sshKnownHosts,
+        sshStrict,
+        persistCredentials
+      );
+
+      const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
+        gitCommanderManager,
+        gitSourceSettings
+      );
+      jest
+        .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
+        .mockReturnValue('/tmp/sshKeyPath');
+
+      await gitAuthHelper.configureAuth();
+
+      expect(rmRFMock).toHaveBeenCalledTimes(1);
+      expect(configExistsMock).toHaveBeenCalledTimes(2);
+      expect(unsetConfigMock).toHaveBeenCalledTimes(2);
+      expect(mkdirSpy).toHaveBeenCalledTimes(1);
+      expect(writeFileSpy).toHaveBeenCalledTimes(3);
+      expect(readFileSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('when readFile of userKnownHostPath throw an issue of non-ENOENT, Error should be thrown', async (): Promise<void> => {
+      jest
+        .spyOn(promises, 'readFile')
+        .mockImplementation(
+          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
+            if (path === '~/.git/config') {
+              return Promise.resolve(buffer);
+            } else if (path === '/home/runner/.ssh/known_hosts') {
+              throw new Error('non-ENOENT error message');
+            }
+            return Promise.resolve('');
+          }
+        );
+      unsetConfigMock.mockImplementation(async (): Promise<boolean> => {
+        return Promise.resolve(true);
+      });
+      getStateSpy.mockImplementation((key: string): string => {
+        return '';
+      });
+      const rmRFMock = jest
+        .spyOn(io, 'rmRF')
+        .mockImplementation(async (inputPath: string): Promise<void> => {
+          return Promise.resolve();
+        });
+
+      const sshKey: string = 'sshKey';
+      const sshKnownHosts: string = 'sshKnownHosts';
+      const sshStrict: boolean = true;
+      const persistCredentials: boolean = true;
+      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
+        repositoryPath,
+        repositoryOwner,
+        repositoryName,
+        authToken,
+        undefined,
+        '1234567890',
+        sshKey,
+        sshKnownHosts,
+        sshStrict,
+        persistCredentials
+      );
+
+      const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
+        gitCommanderManager,
+        gitSourceSettings
+      );
+      jest
+        .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
+        .mockReturnValue('/tmp/sshKeyPath');
+
+      await expect(gitAuthHelper.configureAuth()).rejects.toThrow(
+        new Error('non-ENOENT error message')
+      );
+
+      expect(rmRFMock).toHaveBeenCalledTimes(1);
+      expect(configExistsMock).toHaveBeenCalledTimes(2);
+      expect(unsetConfigMock).toHaveBeenCalledTimes(2);
+      expect(mkdirSpy).toHaveBeenCalledTimes(1);
+      expect(writeFileSpy).toHaveBeenCalledTimes(1);
+      expect(readFileSpy).toHaveBeenCalledTimes(1);
     });
   });
   describe('Test removeAuth function', (): void => {});
