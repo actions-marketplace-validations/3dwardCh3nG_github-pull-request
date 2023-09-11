@@ -13,9 +13,9 @@ import {
 import { GitAuthHelper, IGitAuthHelper } from '../src/git-auth-helper';
 import * as assert from 'assert';
 import * as os from 'os';
-import path from 'path';
 import { PathLike } from 'fs';
 import promises, { FileHandle } from 'fs/promises';
+import path from 'path';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const repositoryPath: string = 'repositoryPath';
@@ -110,10 +110,10 @@ jest.mock('fs/promises', () => {
     readFile: jest
       .fn()
       .mockImplementation(
-        async (path: PathLike | FileHandle): Promise<Buffer | string> => {
-          if (path === '~/.git/config') {
+        async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
+          if (filePath === '~/.git/config') {
             return Promise.resolve(buffer);
-          } else if (path === '/home/runner/.ssh/known_hosts') {
+          } else if (filePath === '/home/runner/.ssh/known_hosts') {
             return Promise.resolve('127.0.0.1');
           }
           return Promise.resolve('');
@@ -123,9 +123,9 @@ jest.mock('fs/promises', () => {
     mkdir: jest.fn()
   };
 });
-const readFileSpy = jest.spyOn(promises, 'readFile');
-const writeFileSpy = jest.spyOn(promises, 'writeFile');
-const mkdirSpy = jest.spyOn(promises, 'mkdir');
+const readFileSpy: jest.SpyInstance = jest.spyOn(promises, 'readFile');
+const writeFileSpy: jest.SpyInstance = jest.spyOn(promises, 'writeFile');
+const mkdirSpy: jest.SpyInstance = jest.spyOn(promises, 'mkdir');
 jest.mock('assert', () => {
   return {
     ...jest.requireActual('assert'),
@@ -189,9 +189,9 @@ describe('Test git-auth-helper.ts', (): void => {
     let pathJoinMock: jest.SpyInstance;
     let assertOkSpy: jest.SpyInstance<any, any>;
 
-    const pathJoinFuncMock = function (...paths: string[]): string {
+    function pathJoinFuncMock(...paths: string[]): string {
       return paths.join('/');
-    };
+    }
 
     beforeEach((): void => {
       jest.spyOn(io, 'rmRF').mockImplementation(async (): Promise<void> => {});
@@ -262,22 +262,23 @@ describe('Test git-auth-helper.ts', (): void => {
       const sshKnownHosts: string = 'sshKnownHosts';
       const sshStrict: boolean = true;
       const persistCredentials: boolean = true;
-      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
-        repositoryPath,
-        repositoryOwner,
-        repositoryName,
-        authToken,
-        githubServerUrl,
-        '1234567890',
-        sshKey,
-        sshKnownHosts,
-        sshStrict,
-        persistCredentials
-      );
+      const gitSourceSettingsOverride: IGitSourceSettings =
+        new GitSourceSettings(
+          repositoryPath,
+          repositoryOwner,
+          repositoryName,
+          authToken,
+          githubServerUrl,
+          '1234567890',
+          sshKey,
+          sshKnownHosts,
+          sshStrict,
+          persistCredentials
+        );
 
       const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
         gitCommanderManager,
-        gitSourceSettings
+        gitSourceSettingsOverride
       );
 
       await gitAuthHelper.configureAuth();
@@ -366,7 +367,10 @@ describe('Test git-auth-helper.ts', (): void => {
     it('when IS_WINDOWS is true and success', async (): Promise<void> => {
       process.env['USERDOMAIN'] = 'userdomain';
       process.env['USERNAME'] = 'username';
-      const rmRFMock = jest
+      const rmRFMock: jest.SpyInstance<
+        Promise<void>,
+        [inputPath: string]
+      > = jest
         .spyOn(io, 'rmRF')
         .mockImplementation(async (inputPath: string): Promise<void> => {
           if (inputPath === '/tmp/sshKeyPath') {
@@ -395,29 +399,30 @@ describe('Test git-auth-helper.ts', (): void => {
       const sshKnownHosts: string = 'sshKnownHosts';
       const sshStrict: boolean = true;
       const persistCredentials: boolean = true;
-      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
-        repositoryPath,
-        repositoryOwner,
-        repositoryName,
-        authToken,
-        undefined,
-        '1234567890',
-        sshKey,
-        sshKnownHosts,
-        sshStrict,
-        persistCredentials
-      );
+      const gitSourceSettingsOverride: IGitSourceSettings =
+        new GitSourceSettings(
+          repositoryPath,
+          repositoryOwner,
+          repositoryName,
+          authToken,
+          undefined,
+          '1234567890',
+          sshKey,
+          sshKnownHosts,
+          sshStrict,
+          persistCredentials
+        );
 
       const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
         gitCommanderManager,
-        gitSourceSettings
+        gitSourceSettingsOverride
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
         .mockReturnValue('/tmp/sshKeyPath');
-      const execMock = jest
+      const execMock: jest.SpyInstance<any, any> = jest
         .spyOn(exec, 'exec')
-        .mockImplementation(async (commandLine: string): Promise<number> => {
+        .mockImplementation(async (): Promise<number> => {
           return Promise.resolve(0);
         });
       jest.spyOn(gitAuthHelper, 'IS_WINDOWS', 'get').mockReturnValue(true);
@@ -457,30 +462,32 @@ describe('Test git-auth-helper.ts', (): void => {
       jest
         .spyOn(promises, 'readFile')
         .mockImplementation(
-          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (path === '~/.git/config') {
+          async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
+            if (filePath === '~/.git/config') {
               return Promise.resolve('');
-            } else if (path === '/home/runner/.ssh/known_hosts') {
+            } else if (filePath === '/home/runner/.ssh/known_hosts') {
               return Promise.resolve('127.0.0.1');
             }
             return Promise.resolve('');
           }
         );
-      unsetConfigMock.mockImplementation(
-        async (configKey: string): Promise<boolean> => {
-          return Promise.resolve(true);
-        }
-      );
+      unsetConfigMock.mockImplementation(async (): Promise<boolean> => {
+        return Promise.resolve(true);
+      });
       getStateSpy.mockImplementation((key: string): string => {
         if (key === 'sshKnownHostsPath') {
           return '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
         }
         return '';
       });
-      const rmRFMock = jest
+      const rmRFMock: jest.SpyInstance<
+        Promise<void>,
+        [inputPath: string]
+      > = jest
         .spyOn(io, 'rmRF')
         .mockImplementation(async (inputPath: string): Promise<void> => {
           if (inputPath === '/tmp/sshKeyPath') {
+            /* eslint-disable-next-line no-throw-literal */
             throw 'rmRF string error';
           } else {
             return Promise.resolve();
@@ -491,22 +498,23 @@ describe('Test git-auth-helper.ts', (): void => {
       const sshKnownHosts: string = 'sshKnownHosts';
       const sshStrict: boolean = true;
       const persistCredentials: boolean = true;
-      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
-        repositoryPath,
-        repositoryOwner,
-        repositoryName,
-        authToken,
-        undefined,
-        '1234567890',
-        sshKey,
-        sshKnownHosts,
-        sshStrict,
-        persistCredentials
-      );
+      const gitSourceSettingsOverride: IGitSourceSettings =
+        new GitSourceSettings(
+          repositoryPath,
+          repositoryOwner,
+          repositoryName,
+          authToken,
+          undefined,
+          '1234567890',
+          sshKey,
+          sshKnownHosts,
+          sshStrict,
+          persistCredentials
+        );
 
       const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
         gitCommanderManager,
-        gitSourceSettings
+        gitSourceSettingsOverride
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
@@ -529,10 +537,11 @@ describe('Test git-auth-helper.ts', (): void => {
       jest
         .spyOn(promises, 'readFile')
         .mockImplementation(
-          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (path === '~/.git/config') {
+          async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
+            if (filePath === '~/.git/config') {
               return Promise.resolve(buffer);
-            } else if (path === '/home/runner/.ssh/known_hosts') {
+            } else if (filePath === '/home/runner/.ssh/known_hosts') {
+              /* eslint-disable-next-line no-throw-literal */
               throw { code: 'ENOENT' };
             }
             return Promise.resolve('');
@@ -541,35 +550,37 @@ describe('Test git-auth-helper.ts', (): void => {
       unsetConfigMock.mockImplementation(async (): Promise<boolean> => {
         return Promise.resolve(true);
       });
-      getStateSpy.mockImplementation((key: string): string => {
+      getStateSpy.mockImplementation((): string => {
         return '';
       });
-      const rmRFMock = jest
-        .spyOn(io, 'rmRF')
-        .mockImplementation(async (inputPath: string): Promise<void> => {
-          return Promise.resolve();
-        });
+      const rmRFMock: jest.SpyInstance<
+        Promise<void>,
+        [inputPath: string]
+      > = jest.spyOn(io, 'rmRF').mockImplementation(async (): Promise<void> => {
+        return Promise.resolve();
+      });
 
       const sshKey: string = 'sshKey';
       const sshKnownHosts: string = 'sshKnownHosts';
       const sshStrict: boolean = true;
       const persistCredentials: boolean = true;
-      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
-        repositoryPath,
-        repositoryOwner,
-        repositoryName,
-        authToken,
-        undefined,
-        '1234567890',
-        sshKey,
-        sshKnownHosts,
-        sshStrict,
-        persistCredentials
-      );
+      const gitSourceSettingsOverride: IGitSourceSettings =
+        new GitSourceSettings(
+          repositoryPath,
+          repositoryOwner,
+          repositoryName,
+          authToken,
+          undefined,
+          '1234567890',
+          sshKey,
+          sshKnownHosts,
+          sshStrict,
+          persistCredentials
+        );
 
       const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
         gitCommanderManager,
-        gitSourceSettings
+        gitSourceSettingsOverride
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
@@ -589,10 +600,10 @@ describe('Test git-auth-helper.ts', (): void => {
       jest
         .spyOn(promises, 'readFile')
         .mockImplementation(
-          async (path: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (path === '~/.git/config') {
+          async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
+            if (filePath === '~/.git/config') {
               return Promise.resolve(buffer);
-            } else if (path === '/home/runner/.ssh/known_hosts') {
+            } else if (filePath === '/home/runner/.ssh/known_hosts') {
               throw new Error('non-ENOENT error message');
             }
             return Promise.resolve('');
@@ -601,35 +612,37 @@ describe('Test git-auth-helper.ts', (): void => {
       unsetConfigMock.mockImplementation(async (): Promise<boolean> => {
         return Promise.resolve(true);
       });
-      getStateSpy.mockImplementation((key: string): string => {
+      getStateSpy.mockImplementation((): string => {
         return '';
       });
-      const rmRFMock = jest
-        .spyOn(io, 'rmRF')
-        .mockImplementation(async (inputPath: string): Promise<void> => {
-          return Promise.resolve();
-        });
+      const rmRFMock: jest.SpyInstance<
+        Promise<void>,
+        [inputPath: string]
+      > = jest.spyOn(io, 'rmRF').mockImplementation(async (): Promise<void> => {
+        return Promise.resolve();
+      });
 
       const sshKey: string = 'sshKey';
       const sshKnownHosts: string = 'sshKnownHosts';
       const sshStrict: boolean = true;
       const persistCredentials: boolean = true;
-      const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
-        repositoryPath,
-        repositoryOwner,
-        repositoryName,
-        authToken,
-        undefined,
-        '1234567890',
-        sshKey,
-        sshKnownHosts,
-        sshStrict,
-        persistCredentials
-      );
+      const gitSourceSettingsOverride: IGitSourceSettings =
+        new GitSourceSettings(
+          repositoryPath,
+          repositoryOwner,
+          repositoryName,
+          authToken,
+          undefined,
+          '1234567890',
+          sshKey,
+          sshKnownHosts,
+          sshStrict,
+          persistCredentials
+        );
 
       const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
         gitCommanderManager,
-        gitSourceSettings
+        gitSourceSettingsOverride
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
