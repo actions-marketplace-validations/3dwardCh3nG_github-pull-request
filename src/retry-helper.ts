@@ -6,7 +6,6 @@ export interface IRetryHelper {
   execute<T>(action: (...vars: unknown[]) => Promise<T>): Promise<T>;
 }
 
-// export class RetryHelper implements IRetryHelper {
 export class RetryHelper implements IRetryHelper {
   private readonly workflowUtils: IWorkflowUtils;
   private readonly maxAttempts: number;

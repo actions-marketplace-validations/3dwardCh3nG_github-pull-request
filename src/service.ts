@@ -2,8 +2,7 @@ import { IInputs } from './inputs';
 import { ErrorMessages, InfoMessages, WarningMessages } from './message';
 import * as core from '@actions/core';
 import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
-import {
-  createGitCommandManager,
+import GitCommandManager, {
   IGitCommandManager,
   IRemoteDetail,
   IWorkingBaseAndType
@@ -261,7 +260,7 @@ class Service implements IService {
 
   private async prepareGitAuthentication(): Promise<IGitPreparationResponse> {
     const repoPath: string = this.workflowUtils.getRepoPath();
-    const git: IGitCommandManager = await createGitCommandManager(repoPath);
+    const git: IGitCommandManager = await GitCommandManager.create(repoPath);
     const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
       repoPath,
       this.inputs.REPO_OWNER,

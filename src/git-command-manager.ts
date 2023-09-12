@@ -76,25 +76,23 @@ export interface IGitCommandManager {
   setEnvironmentVariable(name: string, value: string): void;
 
   removeEnvironmentVariable(name: string): void;
-}
-
-export async function createGitCommandManager(
-  workingDirectory: string
-): Promise<IGitCommandManager> {
-  return await GitCommandManager.create(workingDirectory);
+  get workflowUtils(): IWorkflowUtils;
+  get gitPath(): string;
+  get workingDirectory(): string;
+  get gitEnv(): { [p: string]: string };
 }
 
 export class GitCommandManager implements IGitCommandManager {
-  private readonly workflowUtils: IWorkflowUtils;
-  private gitPath = '';
-  private workingDirectory = '';
-  private gitEnv: { [p: string]: string } = {
+  private readonly _workflowUtils: IWorkflowUtils;
+  private _gitPath: string = '';
+  private _workingDirectory: string = '';
+  private _gitEnv: { [p: string]: string } = {
     GIT_TERMINAL_PROMPT: '0', // Disable git prompt
     GCM_INTERACTIVE: 'Never' // Disable prompting for git credential manager
   };
 
-  private constructor() {
-    this.workflowUtils = new WorkflowUtils();
+  constructor() {
+    this._workflowUtils = new WorkflowUtils();
   }
 
   static async create(workingDirectory: string): Promise<GitCommandManager> {
@@ -114,7 +112,7 @@ export class GitCommandManager implements IGitCommandManager {
 
   getRemoteDetail(remoteUrl: string): IRemoteDetail {
     const githubUrl: string =
-      process.env['GITHUB_SERVER_URL'] || 'https://github.com';
+      process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
     return this.githubHttpsUrlValidator(githubUrl, remoteUrl);
   }
 
@@ -203,8 +201,8 @@ export class GitCommandManager implements IGitCommandManager {
 
     args.push('--progress', '--no-recurse-submodules');
     if (
-      this.workflowUtils.fileExistsSync(
-        path.join(this.workingDirectory, '.git', 'shallow')
+      this._workflowUtils.fileExistsSync(
+        path.join(this._workingDirectory, '.git', 'shallow')
       )
     ) {
       args.push('--unshallow');
@@ -352,7 +350,7 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   getWorkingDirectory(): string {
-    return this.workingDirectory;
+    return this._workingDirectory;
   }
 
   private async revList(
@@ -368,10 +366,10 @@ export class GitCommandManager implements IGitCommandManager {
     return output.getStdout().trim();
   }
 
-  private async init(workingDirectory: string): Promise<void> {
+  async init(workingDirectory: string): Promise<void> {
     core.info(InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
-    this.workingDirectory = workingDirectory;
-    this.gitPath = await io.which('git', true);
+    this._workingDirectory = workingDirectory;
+    this._gitPath = await io.which('git', true);
   }
 
   private async execGit(
@@ -384,7 +382,7 @@ export class GitCommandManager implements IGitCommandManager {
     const env: { [p: string]: string } = this.getEnvs();
 
     const execOptions: exec.ExecOptions = {
-      cwd: this.workingDirectory,
+      cwd: this._workingDirectory,
       env,
       ignoreReturnCode,
       silent,
@@ -401,7 +399,7 @@ export class GitCommandManager implements IGitCommandManager {
       }
     };
 
-    const exitCode: number = await exec.exec(this.gitPath, args, execOptions);
+    const exitCode: number = await exec.exec(this._gitPath, args, execOptions);
     output.exitCode = exitCode;
 
     return output;
@@ -412,15 +410,14 @@ export class GitCommandManager implements IGitCommandManager {
     for (const key of Object.keys(process.env)) {
       env[key] = process.env[key] || '';
     }
-    for (const key of Object.keys(this.gitEnv)) {
-      env[key] = this.gitEnv[key];
+    for (const key of Object.keys(this._gitEnv)) {
+      env[key] = this._gitEnv[key];
     }
     return env;
   }
 
   private urlMatcher(url: string): RegExpMatchArray {
-    const pattern: string = '/^https?:\\/\\/(.+)$/i';
-    const matches: RegExpMatchArray | null = url.match(pattern);
+    const matches: RegExpMatchArray | null = url.match(/^https?:\/\/(.+)$/i);
     if (!matches) {
       throw new Error(ErrorMessages.URL_MATCHER_FAILED);
     }
@@ -455,15 +452,31 @@ export class GitCommandManager implements IGitCommandManager {
       };
     }
     throw new Error(
-      `The format of '${githubUrl}' is not a valid GitHub repository URL`
+      `The format of '${remoteUrl}' is not a valid GitHub repository URL`
     );
   }
 
   setEnvironmentVariable(name: string, value: string): void {
-    this.gitEnv[name] = value;
+    this._gitEnv[name] = value;
   }
 
   removeEnvironmentVariable(name: string): void {
-    delete this.gitEnv[name];
+    delete this._gitEnv[name];
+  }
+
+  get workflowUtils(): IWorkflowUtils {
+    return this._workflowUtils;
+  }
+
+  get gitPath(): string {
+    return this._gitPath;
+  }
+
+  get workingDirectory(): string {
+    return this._workingDirectory;
+  }
+
+  get gitEnv(): { [p: string]: string } {
+    return this._gitEnv;
   }
 }

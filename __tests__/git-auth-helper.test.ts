@@ -2,7 +2,6 @@ import * as core from '@actions/core';
 import * as io from '@actions/io';
 import * as exec from '@actions/exec';
 import {
-  createGitCommandManager,
   GitCommandManager,
   IGitCommandManager
 } from '../src/git-command-manager';
@@ -151,7 +150,7 @@ describe('Test git-auth-helper.ts', (): void => {
   let gitCommanderManager: IGitCommandManager;
 
   beforeAll(async (): Promise<void> => {
-    gitCommanderManager = await createGitCommandManager(repositoryPath);
+    gitCommanderManager = await GitCommandManager.create(repositoryPath);
   });
 
   describe('Test constructor', (): void => {
@@ -660,6 +659,5 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(readFileSpy).toHaveBeenCalledTimes(1);
     });
   });
-  describe('Test removeAuth function', (): void => {});
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */
