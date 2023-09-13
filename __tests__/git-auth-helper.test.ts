@@ -83,7 +83,7 @@ jest.mock('../src/git-command-manager', () => {
     })
   };
 });
-const gitCommandManagerCreateFunctionMock = jest
+const gitCommandManagerCreateFunctionMock: jest.Mock<any, any> = jest
   .fn()
   .mockImplementation(async (workingDirectory: string) => {
     const gitCommandManager: GitCommandManager = new GitCommandManager();

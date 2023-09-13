@@ -1,6 +1,6 @@
 import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 import * as core from '@actions/core';
-import { createService, IService } from './service';
+import { IService, Service } from './service';
 import { Pull } from './github-client';
 import { IInputs, prepareInputValues } from './inputs';
 
@@ -9,7 +9,7 @@ export const run: () => Promise<void> = async (): Promise<void> => {
 
   try {
     const inputs: IInputs = prepareInputValues();
-    const service: IService = createService(inputs);
+    const service: IService = new Service(inputs);
 
     let pullRequest: Pull = await service.createPullRequest();
     if (inputs.AUTO_MERGE) {

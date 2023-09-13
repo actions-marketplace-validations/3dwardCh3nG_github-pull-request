@@ -33,11 +33,7 @@ export interface IService {
   mergePullRequestWithRetries(pullRequest: Pull): Promise<Pull>;
 }
 
-export function createService(inputs: IInputs): IService {
-  return new Service(inputs);
-}
-
-class Service implements IService {
+export class Service implements IService {
   private readonly inputs: IInputs;
   private readonly workflowUtils: IWorkflowUtils;
   private readonly githubClient: IGithubClient;

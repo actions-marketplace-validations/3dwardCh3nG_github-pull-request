@@ -8,6 +8,7 @@ import { WorkflowUtils } from '../src/workflow-utils';
 import { ErrorMessages } from '../src/message';
 import { GitExecOutput } from '../src/git-exec-output';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const workingDirectory: string = '/home/runner/work/_temp/_github_home';
 
 const infoSpy: jest.SpyInstance<void, [message: string]> = jest.spyOn(
@@ -15,11 +16,11 @@ const infoSpy: jest.SpyInstance<void, [message: string]> = jest.spyOn(
   'info'
 );
 
-const gitCommandManagerCreateFunctionMock = jest
+const gitCommandManagerCreateFunctionMock: jest.Mock<any, any> = jest
   .fn()
-  .mockImplementation(async (workingDirectory: string) => {
+  .mockImplementation(async (workingDir: string) => {
     const gitCommandManager: GitCommandManager = new GitCommandManager();
-    await gitCommandManager.init(workingDirectory);
+    await gitCommandManager.init(workingDir);
     return gitCommandManager;
   });
 const initMock: jest.Mock<any, any, any> = jest.fn();
@@ -157,6 +158,7 @@ describe('Test git-command-manager.ts', (): void => {
   });
 
   describe('Test getRemoteDetail function', (): void => {
+    const workingDir: string = '/home/runner/work/_temp/_github_home';
     let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
 
     beforeAll((): void => {
@@ -174,12 +176,9 @@ describe('Test git-command-manager.ts', (): void => {
         'https://github.com/3dwardCh3nG/github-pull-request.git';
 
       const gitCommandManager: GitCommandManager =
-        await GitCommandManagerRealModule.GitCommandManager.create(
-          workingDirectory
-        );
+        await GitCommandManagerRealModule.GitCommandManager.create(workingDir);
 
-      const remoteDetail: any =
-        await gitCommandManager.getRemoteDetail(remoteUrl);
+      const remoteDetail: any = gitCommandManager.getRemoteDetail(remoteUrl);
 
       expect(remoteDetail).toBeDefined();
       expect(remoteDetail.hostname).toBe('github.com');
@@ -191,12 +190,9 @@ describe('Test git-command-manager.ts', (): void => {
       process.env['GITHUB_SERVER_URL'] = 'github.com';
       const remoteUrl: string =
         'https://github.com/3dwardCh3nG/github-pull-request.git';
-      const workingDirectory: string = '/home/runner/work/_temp/_github_home';
 
       const gitCommandManager: GitCommandManager =
-        await GitCommandManagerRealModule.GitCommandManager.create(
-          workingDirectory
-        );
+        await GitCommandManagerRealModule.GitCommandManager.create(workingDir);
 
       expect(() => gitCommandManager.getRemoteDetail(remoteUrl)).toThrow(
         new Error('Not a valid GitHub Service URL')
@@ -206,12 +202,9 @@ describe('Test git-command-manager.ts', (): void => {
     it('should throw error when remote url is not a valid github url', async (): Promise<void> => {
       const remoteUrl: string =
         'https://gitlab.com/3dwardCh3nG/github-pull-request.git';
-      const workingDirectory: string = '/home/runner/work/_temp/_github_home';
 
       const gitCommandManager: GitCommandManager =
-        await GitCommandManagerRealModule.GitCommandManager.create(
-          workingDirectory
-        );
+        await GitCommandManagerRealModule.GitCommandManager.create(workingDir);
 
       expect(() => gitCommandManager.getRemoteDetail(remoteUrl)).toThrow(
         new Error(
@@ -446,11 +439,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 2 &&
             args[0] === 'stash' &&
@@ -475,11 +464,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success with options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 3 &&
             args[0] === 'stash' &&
@@ -553,7 +538,7 @@ describe('Test git-command-manager.ts', (): void => {
       expect(execMock).toHaveBeenCalledTimes(1);
     });
 
-    it('should success and return true when checkout to a branch', async (): Promise<void> => {
+    it('should success and return true when checkout to a branch with startpoint', async (): Promise<void> => {
       const ref: string = 'this-is-the-develop-branch';
       const startPoint: string = 'HEAD';
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
@@ -632,6 +617,7 @@ describe('Test git-command-manager.ts', (): void => {
   });
 
   describe('Test fetch function', (): void => {
+    const workingDir: string = '/home/runner/work/_temp/_github_home';
     const execSpy: jest.SpyInstance = jest.spyOn(exec, 'exec');
     let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
 
@@ -644,11 +630,7 @@ describe('Test git-command-manager.ts', (): void => {
     it('should success and return true when fetch from remote', async (): Promise<void> => {
       fileExistsSyncMock.mockReturnValue(true);
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 9 &&
             args[0] === '-c' &&
@@ -669,9 +651,7 @@ describe('Test git-command-manager.ts', (): void => {
       );
 
       const gitCommandManager: GitCommandManager =
-        await GitCommandManagerRealModule.GitCommandManager.create(
-          workingDirectory
-        );
+        await GitCommandManagerRealModule.GitCommandManager.create(workingDir);
 
       const remote: string = 'origin';
       const branch: string = 'develop';
@@ -685,11 +665,7 @@ describe('Test git-command-manager.ts', (): void => {
     it('should success and return true when fetch from remote with fileExistsSync is false', async (): Promise<void> => {
       fileExistsSyncMock.mockReturnValue(false);
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 8 &&
             args[0] === '-c' &&
@@ -709,9 +685,7 @@ describe('Test git-command-manager.ts', (): void => {
       );
 
       const gitCommandManager: GitCommandManager =
-        await GitCommandManagerRealModule.GitCommandManager.create(
-          workingDirectory
-        );
+        await GitCommandManagerRealModule.GitCommandManager.create(workingDir);
 
       const remote: string = 'github';
       const branch: string = 'develop';
@@ -727,12 +701,8 @@ describe('Test git-command-manager.ts', (): void => {
         throw new Error(ErrorMessages.FILE_EXISTS_CHECK_ERROR);
       });
 
-      const workingDirectory: string = '/home/runner/work/_temp/_github_home';
-
       const gitCommandManager: GitCommandManager =
-        await GitCommandManagerRealModule.GitCommandManager.create(
-          workingDirectory
-        );
+        await GitCommandManagerRealModule.GitCommandManager.create(workingDir);
 
       const remote: string = 'origin';
       const branch: string = 'develop';
@@ -756,11 +726,7 @@ describe('Test git-command-manager.ts', (): void => {
     it('should success and use default remote value origin when remote is not given', async (): Promise<void> => {
       fileExistsSyncMock.mockReturnValue(true);
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 9 &&
             args[0] === '-c' &&
@@ -1158,11 +1124,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when pull from remote with no options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 1 &&
             args[0] === 'pull' &&
@@ -1186,11 +1148,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when pull from remote with options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 2 &&
             args[0] === 'pull' &&
@@ -1226,11 +1184,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when push to remote with no options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 1 &&
             args[0] === 'push' &&
@@ -1254,11 +1208,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when push to remote with options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 2 &&
             args[0] === 'push' &&
@@ -1294,11 +1244,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when delete branch with no options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 3 &&
             args[0] === 'branch' &&
@@ -1326,11 +1272,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when delete branch with options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 4 &&
             args[0] === 'branch' &&
@@ -1448,11 +1390,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return true when has diff with no options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 2 &&
             args[0] === 'diff' &&
@@ -1478,11 +1416,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return true when has diff with options', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 3 &&
             args[0] === 'diff' &&
@@ -1509,11 +1443,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return false when has no diff', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 2 &&
             args[0] === 'diff' &&
@@ -1553,11 +1483,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when config with globalConfig and add to be true', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 5 &&
             args[0] === 'config' &&
@@ -1585,11 +1511,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when config with globalConfig and add to be false', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 4 &&
             args[0] === 'config' &&
@@ -1616,11 +1538,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should success when config with globalConfig and add not provided', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 4 &&
             args[0] === 'config' &&
@@ -1660,11 +1578,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return true when config with globalConfig to be true', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 5 &&
             args[0] === 'config' &&
@@ -1696,11 +1610,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return false when config with globalConfig to be false', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 5 &&
             args[0] === 'config' &&
@@ -1732,11 +1642,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return true when config with globalConfig is not provided', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 5 &&
             args[0] === 'config' &&
@@ -1778,11 +1684,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return true when unsetConfig with globalConfig to be true', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 4 &&
             args[0] === 'config' &&
@@ -1813,11 +1715,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return false when unsetConfig with globalConfig to be false', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 4 &&
             args[0] === 'config' &&
@@ -1848,11 +1746,7 @@ describe('Test git-command-manager.ts', (): void => {
 
     it('should return true when unsetConfig with globalConfig is not provided', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
-        async (
-          gitPath: string,
-          args: string[],
-          options: exec.ExecOptions
-        ): Promise<number> => {
+        async (gitPath: string, args: string[]): Promise<number> => {
           if (
             args.length === 4 &&
             args[0] === 'config' &&
@@ -2068,3 +1962,4 @@ describe('Test git-command-manager.ts', (): void => {
     });
   });
 });
+/* eslint-enable @typescript-eslint/no-explicit-any */
