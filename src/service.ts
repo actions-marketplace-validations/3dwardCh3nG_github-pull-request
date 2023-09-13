@@ -2,7 +2,8 @@ import { IInputs } from './inputs';
 import { ErrorMessages, InfoMessages, WarningMessages } from './message';
 import * as core from '@actions/core';
 import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
-import GitCommandManager, {
+import {
+  GitCommandManager,
   IGitCommandManager,
   IRemoteDetail,
   IWorkingBaseAndType

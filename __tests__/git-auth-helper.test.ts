@@ -61,11 +61,6 @@ const configMock: jest.Mock<any, any, any> = jest
   .mockImplementation(async (): Promise<void> => {
     return Promise.resolve();
   });
-const getWorkingDirectoryMock: jest.Mock<any, any, any> = jest
-  .fn()
-  .mockImplementation((): string => {
-    return '~';
-  });
 const setEnvironmentVariableMock: jest.Mock<any, any, any> = jest
   .fn()
   .mockImplementation((): void => {});
@@ -75,8 +70,8 @@ const gitCommandManagerMock: GitCommandManager = {
   configExists: configExistsMock,
   unsetConfig: unsetConfigMock,
   getGitDirectory: jest.fn(),
-  getWorkingDirectory: getWorkingDirectoryMock,
-  setEnvironmentVariable: setEnvironmentVariableMock
+  setEnvironmentVariable: setEnvironmentVariableMock,
+  init: jest.fn()
 } as GitCommandManager;
 jest.mock('../src/git-command-manager', () => {
   return {
@@ -88,6 +83,13 @@ jest.mock('../src/git-command-manager', () => {
     })
   };
 });
+const gitCommandManagerCreateFunctionMock = jest
+  .fn()
+  .mockImplementation(async (workingDirectory: string) => {
+    const gitCommandManager: GitCommandManager = new GitCommandManager();
+    await gitCommandManager.init(workingDirectory);
+    return gitCommandManager;
+  });
 const gitConfigContent: string = `[core]
   \trepositoryformatversion = 0
   \tfilemode = true
@@ -110,7 +112,7 @@ jest.mock('fs/promises', () => {
       .fn()
       .mockImplementation(
         async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
-          if (filePath === '~/.git/config') {
+          if (filePath === '/.git/config') {
             return Promise.resolve(buffer);
           } else if (filePath === '/home/runner/.ssh/known_hosts') {
             return Promise.resolve('127.0.0.1');
@@ -150,6 +152,7 @@ describe('Test git-auth-helper.ts', (): void => {
   let gitCommanderManager: IGitCommandManager;
 
   beforeAll(async (): Promise<void> => {
+    GitCommandManager.create = gitCommandManagerCreateFunctionMock;
     gitCommanderManager = await GitCommandManager.create(repositoryPath);
   });
 
@@ -237,7 +240,6 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(unsetConfigMock).toHaveBeenCalledWith(
         'http.https://github.com/.extraheader'
       );
-      expect(getWorkingDirectoryMock).toHaveBeenCalledTimes(1);
       expect(configMock).toHaveBeenCalledTimes(1);
       expect(configMock).toHaveBeenCalledWith(
         'http.https://github.com/.extraheader',
@@ -318,7 +320,7 @@ describe('Test git-auth-helper.ts', (): void => {
         'Unexpected configureToken parameter combinations'
       );
       expect(assertOkSpy).toHaveBeenCalledWith(
-        '~/.git/config',
+        '/.git/config',
         'configPath is not defined'
       );
       expect(assertOkSpy).toHaveBeenCalledWith(
@@ -336,7 +338,7 @@ describe('Test git-auth-helper.ts', (): void => {
         runnerTemp,
         `${uuid4}_known_hosts`
       );
-      expect(pathJoinMock).toHaveBeenCalledWith('~', '.git', 'config');
+      expect(pathJoinMock).toHaveBeenCalledWith(undefined, '.git', 'config');
       expect(saveStateSpy).toHaveBeenCalledTimes(2);
       expect(saveStateSpy).toHaveBeenCalledWith('sshKeyPath', sshKeyPath);
       expect(saveStateSpy).toHaveBeenCalledWith(
@@ -462,7 +464,7 @@ describe('Test git-auth-helper.ts', (): void => {
         .spyOn(promises, 'readFile')
         .mockImplementation(
           async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (filePath === '~/.git/config') {
+            if (filePath === '/.git/config') {
               return Promise.resolve('');
             } else if (filePath === '/home/runner/.ssh/known_hosts') {
               return Promise.resolve('127.0.0.1');
@@ -520,7 +522,7 @@ describe('Test git-auth-helper.ts', (): void => {
         .mockReturnValue('/tmp/sshKeyPath');
 
       await expect(gitAuthHelper.configureAuth()).rejects.toThrow(
-        new Error('Unable to replace auth placeholder in ~/.git/config')
+        new Error('Unable to replace auth placeholder in /.git/config')
       );
 
       expect(rmRFMock).toHaveBeenCalledTimes(2);
@@ -537,7 +539,7 @@ describe('Test git-auth-helper.ts', (): void => {
         .spyOn(promises, 'readFile')
         .mockImplementation(
           async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (filePath === '~/.git/config') {
+            if (filePath === '/.git/config') {
               return Promise.resolve(buffer);
             } else if (filePath === '/home/runner/.ssh/known_hosts') {
               /* eslint-disable-next-line no-throw-literal */
@@ -600,7 +602,7 @@ describe('Test git-auth-helper.ts', (): void => {
         .spyOn(promises, 'readFile')
         .mockImplementation(
           async (filePath: PathLike | FileHandle): Promise<Buffer | string> => {
-            if (filePath === '~/.git/config') {
+            if (filePath === '/.git/config') {
               return Promise.resolve(buffer);
             } else if (filePath === '/home/runner/.ssh/known_hosts') {
               throw new Error('non-ENOENT error message');

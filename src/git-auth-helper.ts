@@ -167,7 +167,7 @@ export class GitAuthHelper implements IGitAuthHelper {
 
     // Default config path
     if (!configPath && !globalConfig) {
-      configPath = path.join(this.git.getWorkingDirectory(), '.git', 'config');
+      configPath = path.join(this.git.workingDirectory, '.git', 'config');
     }
 
     // Configure a placeholder value. This approach avoids the credential being captured

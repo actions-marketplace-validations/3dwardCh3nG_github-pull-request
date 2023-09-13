@@ -71,8 +71,6 @@ export interface IGitCommandManager {
 
   getGitDirectory(): Promise<string>;
 
-  getWorkingDirectory(): string;
-
   setEnvironmentVariable(name: string, value: string): void;
 
   removeEnvironmentVariable(name: string): void;
@@ -165,7 +163,7 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   async checkout(ref: string, startPoint?: string): Promise<void> {
-    const args: string[] = ['checkout', '--progress'];
+    const args: string[] = ['checkout', '--progress', '--force'];
     if (startPoint) {
       args.push('-B', ref, startPoint);
     } else {
@@ -201,8 +199,8 @@ export class GitCommandManager implements IGitCommandManager {
 
     args.push('--progress', '--no-recurse-submodules');
     if (
-      this._workflowUtils.fileExistsSync(
-        path.join(this._workingDirectory, '.git', 'shallow')
+      this.workflowUtils.fileExistsSync(
+        path.join(this.workingDirectory, '.git', 'shallow')
       )
     ) {
       args.push('--unshallow');
@@ -349,10 +347,6 @@ export class GitCommandManager implements IGitCommandManager {
     return this.revParse('--git-dir');
   }
 
-  getWorkingDirectory(): string {
-    return this._workingDirectory;
-  }
-
   private async revList(
     commitExpression: string[],
     options?: string[]
@@ -382,7 +376,7 @@ export class GitCommandManager implements IGitCommandManager {
     const env: { [p: string]: string } = this.getEnvs();
 
     const execOptions: exec.ExecOptions = {
-      cwd: this._workingDirectory,
+      cwd: this.workingDirectory,
       env,
       ignoreReturnCode,
       silent,
