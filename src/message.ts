@@ -21,8 +21,6 @@ export const ErrorMessages: { [key: string]: string } = {
     'The minSeconds should be less than or equal to the maxSeconds',
   BRANCH_NAME_SAME_ERROR:
     'The source_branch and the target_branch for a pull request must be different branches. Unable to continue.',
-  TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS:
-    'When in the detached HEAD state, the target_branch input must be supplied.',
   TARGET_BRANCH_IS_NOT_SUPPLIED:
     'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.',
   FILE_EXISTS_CHECK_ERROR:

@@ -27,6 +27,10 @@ export interface ICreateOrUpdatePullRequestBranchResult {
   headSha: string;
 }
 
+export function createService(inputs: IInputs): IService {
+  return new Service(inputs);
+}
+
 export interface IService {
   createPullRequest(): Promise<Pull>;
 
@@ -140,14 +144,6 @@ export class Service implements IService {
 
     const workingBaseAndType: IWorkingBaseAndType =
       await git.getWorkingBaseAndType();
-    if (
-      workingBaseAndType.workingBaseType === 'commit' &&
-      !this.inputs.TARGET_BRANCH_NAME
-    ) {
-      throw new Error(
-        ErrorMessages.TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS
-      );
-    }
 
     const stashed: boolean = await git.stashPush(['--include-untracked']);
 
