@@ -157,6 +157,10 @@ describe('Test git-auth-helper.ts', (): void => {
   });
 
   describe('Test constructor', (): void => {
+    afterAll((): void => {
+      delete process.env['GITHUB_SERVER_URL'];
+    });
+
     it('should create an instance with initialised values', (): void => {
       const basicCredential: string = Buffer.from(
         `x-access-token:${authToken}`,
@@ -183,6 +187,21 @@ describe('Test git-auth-helper.ts', (): void => {
         'git@github.com:',
         'org-1234567890@github.com:'
       ]);
+    });
+
+    it('should create an instance with initialised values without having server url in settings', (): void => {
+      const githubServerUrl: string = 'https://github.com.au';
+      process.env['GITHUB_SERVER_URL'] = githubServerUrl;
+
+      const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
+        gitCommanderManager,
+        gitSourceSettings
+      );
+
+      expect(gitAuthHelper).toBeDefined();
+      expect(gitAuthHelper.tokenConfigKey).toEqual(
+        'http.https://github.com.au/.extraheader'
+      );
     });
   });
 
