@@ -69,7 +69,9 @@ export class Service implements IService {
         await this.preparePullRequestBranch(git);
       core.endGroup();
 
+      core.startGroup('Pushing the pull request branch');
       await this.pushPullRequestBranch(git, result);
+      core.endGroup();
 
       if (result.hasDiffWithTargetBranch) {
         core.startGroup('Create or update the pull request');
@@ -81,6 +83,7 @@ export class Service implements IService {
       }
     } catch (error) {
       core.setFailed(this.workflowUtils.getErrorMessage(error));
+      process.exit(1);
     } finally {
       await gitAuthHelper.removeAuth();
     }

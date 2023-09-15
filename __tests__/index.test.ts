@@ -93,6 +93,8 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocks();
+      expect(startGroupMock).toHaveBeenCalledTimes(2);
+      expect(endGroupMock).toHaveBeenCalledTimes(2);
       expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(0);
     });
 
@@ -110,6 +112,8 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocks();
+      expect(startGroupMock).toHaveBeenCalledTimes(3);
+      expect(endGroupMock).toHaveBeenCalledTimes(3);
       expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(1);
     });
 
@@ -127,6 +131,7 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocksWithError();
+      expect(startGroupMock).toHaveBeenCalledTimes(1);
       expect(createPullRequestMock).toHaveBeenCalledTimes(0);
       expect(createPullRequestThrowErrorMock).toHaveBeenCalledTimes(1);
       expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(0);
@@ -149,6 +154,8 @@ describe('Test index.ts', (): void => {
       await index.run();
 
       verifyMocksWithError();
+      expect(startGroupMock).toHaveBeenCalledTimes(2);
+      expect(endGroupMock).toHaveBeenCalledTimes(1);
       expect(createPullRequestMock).toHaveBeenCalledTimes(1);
       expect(createPullRequestThrowErrorMock).toHaveBeenCalledTimes(0);
       expect(mergePullRequestWithRetriesMock).toHaveBeenCalledTimes(0);
@@ -204,8 +211,6 @@ function verifyMocks(): void {
   expect(createServiceMock).toHaveBeenCalledTimes(1);
   expect(setOutputMock).toHaveBeenCalledTimes(6);
   expect(setFailedMock).toHaveBeenCalledTimes(0);
-  expect(startGroupMock).toHaveBeenCalledTimes(1);
-  expect(endGroupMock).toHaveBeenCalledTimes(1);
   expect(createPullRequestMock).toHaveBeenCalledTimes(1);
 }
 
@@ -214,6 +219,4 @@ function verifyMocksWithError(): void {
   expect(createServiceMock).toHaveBeenCalledTimes(1);
   expect(setOutputMock).toHaveBeenCalledTimes(0);
   expect(setFailedMock).toHaveBeenCalledTimes(1);
-  expect(startGroupMock).toHaveBeenCalledTimes(0);
-  expect(endGroupMock).toHaveBeenCalledTimes(0);
 }

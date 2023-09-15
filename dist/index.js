@@ -14514,9 +14514,13 @@ const run = async () => {
     try {
         const inputs = (0, inputs_1.prepareInputValues)();
         const service = (0, service_1.createService)(inputs);
+        core.startGroup('Starting to create pull request');
         let pullRequest = await service.createPullRequest();
+        core.endGroup();
         if (inputs.AUTO_MERGE) {
+            core.startGroup('Starting to merge pull request');
             pullRequest = await service.mergePullRequestWithRetries(pullRequest);
+            core.endGroup();
         }
         core.startGroup('Setting outputs');
         core.setOutput('pull-request-number', pullRequest.number);
@@ -14927,7 +14931,9 @@ class Service {
             core.startGroup('Create or update the pull request branch');
             const result = await this.preparePullRequestBranch(git);
             core.endGroup();
+            core.startGroup('Pushing the pull request branch');
             await this.pushPullRequestBranch(git, result);
+            core.endGroup();
             if (result.hasDiffWithTargetBranch) {
                 core.startGroup('Create or update the pull request');
                 pullRequest = await this.githubClient.preparePullRequest(this.inputs, result);
@@ -14936,6 +14942,7 @@ class Service {
         }
         catch (error) {
             core.setFailed(this.workflowUtils.getErrorMessage(error));
+            process.exit(1);
         }
         finally {
             await gitAuthHelper.removeAuth();

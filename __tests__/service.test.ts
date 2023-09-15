@@ -169,6 +169,12 @@ jest.mock('../src/retry-helper-wrapper', () => {
 });
 
 describe('Test service.ts', (): void => {
+  beforeAll((): void => {
+    jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit() was called.');
+    });
+  });
+
   describe('Test createService function', (): void => {
     it('should return a new Service object', (): void => {
       setRequiredProcessEnvValues();
@@ -260,8 +266,8 @@ describe('Test service.ts', (): void => {
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(4);
-        expect(startGroupMock).toHaveBeenCalledTimes(3);
-        expect(endGroupMock).toHaveBeenCalledTimes(3);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
@@ -305,8 +311,8 @@ describe('Test service.ts', (): void => {
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(4);
-        expect(startGroupMock).toHaveBeenCalledTimes(1);
-        expect(endGroupMock).toHaveBeenCalledTimes(1);
+        expect(startGroupMock).toHaveBeenCalledTimes(2);
+        expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
@@ -366,8 +372,8 @@ describe('Test service.ts', (): void => {
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(3);
-        expect(endGroupMock).toHaveBeenCalledTimes(3);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
@@ -433,8 +439,8 @@ describe('Test service.ts', (): void => {
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(2);
-        expect(endGroupMock).toHaveBeenCalledTimes(2);
+        expect(startGroupMock).toHaveBeenCalledTimes(3);
+        expect(endGroupMock).toHaveBeenCalledTimes(3);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
@@ -497,14 +503,16 @@ describe('Test service.ts', (): void => {
         const inputs: IInputs = prepareInputValues();
         const service: IService = ServiceModule.createService(inputs);
 
-        const result: Pull = await service.createPullRequest();
+        await expect(service.createPullRequest()).rejects.toThrow(
+          new Error('process.exit() was called.')
+        );
 
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(2);
-        expect(endGroupMock).toHaveBeenCalledTimes(1);
+        expect(startGroupMock).toHaveBeenCalledTimes(3);
+        expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
@@ -535,14 +543,6 @@ describe('Test service.ts', (): void => {
         expect(setFailedMock).toHaveBeenCalledWith(
           'Error when calling githubClient.preparePullRequest'
         );
-        expect(result).toEqual({
-          number: 0,
-          sha: '',
-          html_url: '',
-          action: '',
-          created: false,
-          merged: false
-        } as Pull);
       });
     });
 
