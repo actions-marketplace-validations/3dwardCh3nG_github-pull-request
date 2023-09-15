@@ -13,12 +13,20 @@ import {
   IGitSourceSettings
 } from '../src/git-source-settings';
 import * as core from '@actions/core';
-import { ErrorMessages } from '../src/message';
+import { IRetryHelper, RetryHelper } from '../src/retry-helper';
+import * as RetryHelperWrapper from '../src/retry-helper-wrapper';
+import { createRetryHelper } from '../src/retry-helper-wrapper';
+import { AnnotationProperties } from '@actions/core';
+import { ErrorMessages, WarningMessages } from '../src/message';
 
 const infoMock: jest.SpyInstance<void, [message: string]> = jest.spyOn(
   core,
   'info'
 );
+const warningMock: jest.SpyInstance<
+  void,
+  [message: string | Error, properties?: AnnotationProperties | undefined]
+> = jest.spyOn(core, 'warning');
 const startGroupMock: jest.SpyInstance<void, [name: string]> = jest.spyOn(
   core,
   'startGroup'
@@ -113,11 +121,13 @@ jest.mock('../src/service', () => {
   };
 });
 const preparePullRequestMock: jest.Mock<any, any, any> = jest.fn();
+const mergePullRequestMock: jest.Mock<any, any, any> = jest.fn();
 jest.mock('../src/github-client', () => {
   return {
     GithubClient: jest.fn().mockImplementation((githubToken: string) => {
       return {
-        preparePullRequest: preparePullRequestMock
+        preparePullRequest: preparePullRequestMock,
+        mergePullRequest: mergePullRequestMock
       };
     })
   };
@@ -150,6 +160,13 @@ jest.mock('../src/git-source-settings', () => {
         persistCredentials: false
       } as IGitSourceSettings;
     })
+  };
+});
+jest.mock('../src/retry-helper-wrapper', () => {
+  return {
+    ...jest.requireActual('../src/retry-helper-wrapper'),
+    executeWithCustomised: jest.fn(),
+    createRetryHelper: jest.fn()
   };
 });
 
@@ -195,6 +212,36 @@ describe('Test service.ts', (): void => {
       stashPushMock.mockReturnValue(true);
       revParseMock.mockReturnValue('sha');
       preparePullRequestMock.mockReturnValue(pull);
+    });
+
+    describe('Test constructor', (): void => {
+      it('should create a new Service object with warning of over sized PR Body message and shortened it', (): void => {
+        setRequiredProcessEnvValues();
+        setOptionalProcessEnvValues();
+        process.env['INPUT_PR_BODY'] = 'x'.repeat(65550);
+
+        const inputs: IInputs = prepareInputValues();
+
+        const service: IService = ServiceModule.createService(inputs);
+
+        expect(warningMock).toHaveBeenCalledTimes(1);
+        expect(warningMock).toHaveBeenCalledWith(
+          WarningMessages.PR_BODY_TOO_LONG
+        );
+        expect((service as any).inputs.PR_BODY.length).toEqual(65536);
+      });
+
+      it('should throw error if source and target branches are the same', (): void => {
+        setRequiredProcessEnvValues();
+        setOptionalProcessEnvValues();
+        process.env['INPUT_TARGET_BRANCH'] = 'source-branch';
+
+        const inputs: IInputs = prepareInputValues();
+
+        expect(() => ServiceModule.createService(inputs)).toThrow(
+          new Error(ErrorMessages.BRANCH_NAME_SAME_ERROR)
+        );
+      });
     });
 
     describe('Test createPullRequest function', (): void => {
@@ -503,6 +550,174 @@ describe('Test service.ts', (): void => {
         } as Pull);
       });
     });
+
+    describe('Test mergePullRequestWithRetries function', (): void => {
+      it('should success when calling mergePullRequestWithRetries function', async (): Promise<void> => {
+        const mergedPull: Pull = {
+          number: 2,
+          sha: 'sha1',
+          html_url: 'html_url1',
+          action: 'merged',
+          created: false,
+          merged: true
+        } as Pull;
+        mergePullRequestMock.mockReturnValue(mergedPull);
+
+        setRequiredProcessEnvValues();
+        setOptionalProcessEnvValues();
+        const inputs: IInputs = prepareInputValues();
+        const service: IService = ServiceModule.createService(inputs);
+
+        const result: Pull = await service.mergePullRequestWithRetries(pull);
+
+        expect(infoMock).toHaveBeenCalledTimes(2);
+        expect(startGroupMock).toHaveBeenCalledTimes(1);
+        expect(mergePullRequestMock).toHaveBeenCalledTimes(1);
+        expect(endGroupMock).toHaveBeenCalledTimes(1);
+        expect(removeAuthMock).toHaveBeenCalledTimes(1);
+        expect(result).toEqual(mergedPull);
+      });
+
+      it('should trigger the retry and then fail the action execution when githubClient.mergePullRequest throws the error', async (): Promise<void> => {
+        const error: Error = Error(
+          'Error when calling githubClient.mergePullRequest'
+        );
+        mergePullRequestMock.mockImplementation(() => {
+          throw error;
+        });
+        const executeWithCustomisedMock = jest
+          .spyOn(RetryHelperWrapper, 'executeWithCustomised')
+          .mockImplementation(
+            async (
+              maxAttempts: number,
+              minSeconds: number | undefined,
+              maxSeconds: number | undefined,
+              attemptsInterval: number | undefined,
+              action: (...vars: unknown[]) => Promise<any>
+            ): Promise<any> => {
+              const retryHelper: IRetryHelper = createRetryHelper(
+                maxAttempts,
+                minSeconds,
+                maxSeconds,
+                attemptsInterval
+              );
+              return await retryHelper.execute(action);
+            }
+          );
+        const createRetryHelperMock = jest
+          .spyOn(RetryHelperWrapper, 'createRetryHelper')
+          .mockImplementation(
+            (
+              maxAttempts: number,
+              minSeconds: number | undefined,
+              maxSeconds: number | undefined,
+              attemptsInterval: number | undefined
+            ): RetryHelper => {
+              return new RetryHelper(
+                maxAttempts,
+                minSeconds,
+                maxSeconds,
+                attemptsInterval
+              );
+            }
+          );
+
+        setRequiredProcessEnvValues();
+        setOptionalProcessEnvValues();
+        delete process.env['INPUT_REQUIRE_MIDDLE_BRANCH'];
+        const inputs: IInputs = prepareInputValues();
+        const service: IService = ServiceModule.createService(inputs);
+
+        await expect(service.mergePullRequestWithRetries(pull)).rejects.toThrow(
+          error
+        );
+
+        expect(infoMock).toHaveBeenCalledTimes(7);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(mergePullRequestMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(0);
+        expect(executeWithCustomisedMock).toHaveBeenCalledTimes(1);
+        expect(createRetryHelperMock).toHaveBeenCalledTimes(1);
+        expect(WorkflowUtils).toHaveBeenCalledTimes(3);
+        expect(setFailedMock).toHaveBeenCalledTimes(4);
+        expect(removeAuthMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('should success but trigger the retry and then fail the action execution when githubClient.mergePullRequest throws the error on for the first time', async (): Promise<void> => {
+        const mergedPull: Pull = {
+          number: 2,
+          sha: 'sha1',
+          html_url: 'html_url1',
+          action: 'merged',
+          created: false,
+          merged: true
+        } as Pull;
+        const error: Error = Error(
+          'Error when calling githubClient.mergePullRequest'
+        );
+        mergePullRequestMock.mockImplementationOnce(() => {
+          throw error;
+        });
+        mergePullRequestMock.mockImplementationOnce(() => {
+          return mergedPull;
+        });
+        const executeWithCustomisedMock = jest
+          .spyOn(RetryHelperWrapper, 'executeWithCustomised')
+          .mockImplementation(
+            async (
+              maxAttempts: number,
+              minSeconds: number | undefined,
+              maxSeconds: number | undefined,
+              attemptsInterval: number | undefined,
+              action: (...vars: unknown[]) => Promise<any>
+            ): Promise<any> => {
+              const retryHelper: IRetryHelper = createRetryHelper(
+                maxAttempts,
+                minSeconds,
+                maxSeconds,
+                attemptsInterval
+              );
+              return await retryHelper.execute(action);
+            }
+          );
+        const createRetryHelperMock = jest
+          .spyOn(RetryHelperWrapper, 'createRetryHelper')
+          .mockImplementation(
+            (
+              maxAttempts: number,
+              minSeconds: number | undefined,
+              maxSeconds: number | undefined,
+              attemptsInterval: number | undefined
+            ): RetryHelper => {
+              return new RetryHelper(
+                maxAttempts,
+                minSeconds,
+                maxSeconds,
+                attemptsInterval
+              );
+            }
+          );
+
+        setRequiredProcessEnvValues();
+        setOptionalProcessEnvValues();
+        delete process.env['INPUT_REQUIRE_MIDDLE_BRANCH'];
+        const inputs: IInputs = prepareInputValues();
+        const service: IService = ServiceModule.createService(inputs);
+
+        const result: Pull = await service.mergePullRequestWithRetries(pull);
+
+        expect(infoMock).toHaveBeenCalledTimes(2);
+        expect(startGroupMock).toHaveBeenCalledTimes(2);
+        expect(mergePullRequestMock).toHaveBeenCalledTimes(2);
+        expect(endGroupMock).toHaveBeenCalledTimes(1);
+        expect(executeWithCustomisedMock).toHaveBeenCalledTimes(1);
+        expect(createRetryHelperMock).toHaveBeenCalledTimes(1);
+        expect(WorkflowUtils).toHaveBeenCalledTimes(3);
+        expect(setFailedMock).toHaveBeenCalledTimes(1);
+        expect(removeAuthMock).toHaveBeenCalledTimes(1);
+        expect(result).toEqual(mergedPull);
+      });
+    });
   });
 });
 
@@ -521,8 +736,8 @@ function setOptionalProcessEnvValues(): void {
   process.env['INPUT_DRAFT'] = 'true';
   process.env['INPUT_REQUIRE_MIDDLE_BRANCH'] = 'true';
   process.env['INPUT_AUTO_MERGE'] = 'true';
-  process.env['INPUT_MAX_MERGE_RETRIES'] = '30';
-  process.env['INPUT_MERGE_RETRY_INTERVAL'] = '30';
+  process.env['INPUT_MAX_MERGE_RETRIES'] = '3';
+  process.env['INPUT_MERGE_RETRY_INTERVAL'] = '1';
   process.env['INPUT_MILESTONE'] = '2';
   process.env['INPUT_ASSIGNEES'] = '3dwardch3ng';
   process.env['INPUT_REVIEWERS'] = '3dwardch3ng';

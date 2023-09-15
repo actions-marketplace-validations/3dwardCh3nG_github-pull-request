@@ -286,15 +286,8 @@ export class Service implements IService {
   }
 
   private inputDataChecks(): void {
-    this.checkGithubToken();
     this.checkBodySize();
     this.checkBranchNames();
-  }
-
-  private checkGithubToken(): void {
-    if (!this.inputs.GITHUB_TOKEN) {
-      throw new Error(ErrorMessages.INPUT_GITHUB_TOKEN_NOT_SUPPLIED);
-    }
   }
 
   private checkBodySize(): void {
