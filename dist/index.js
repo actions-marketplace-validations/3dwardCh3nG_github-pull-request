@@ -13955,6 +13955,9 @@ class GitCommandManager {
         }
         await this.execGit(args);
     }
+    async fetchAll() {
+        await this.execGit(['fetch']);
+    }
     async isAhead(branch1, branch2, options) {
         return (await this.commitsAhead(branch1, branch2, options)) > 0;
     }
@@ -15000,7 +15003,7 @@ class Service {
         core.info(`Working base is ${workingBaseAndType.workingBaseType} '${workingBaseAndType.workingBase}'`);
         const stashed = await git.stashPush(['--include-untracked']);
         if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
-            await git.fetchRemote([`${this.inputs.SOURCE_BRANCH_NAME}:${this.inputs.SOURCE_BRANCH_NAME}`], this.inputs.REMOTE_NAME, ['--force']);
+            await git.fetchAll();
             await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
             await git.pull([this.inputs.REMOTE_NAME, this.inputs.SOURCE_BRANCH_NAME]);
         }

@@ -42,6 +42,8 @@ export interface IGitCommandManager {
     options?: string[]
   ): Promise<void>;
 
+  fetchAll(): Promise<void>;
+
   isAhead(
     branch1: string,
     branch2: string,
@@ -228,6 +230,10 @@ export class GitCommandManager implements IGitCommandManager {
     }
 
     await this.execGit(args);
+  }
+
+  async fetchAll(): Promise<void> {
+    await this.execGit(['fetch']);
   }
 
   async isAhead(

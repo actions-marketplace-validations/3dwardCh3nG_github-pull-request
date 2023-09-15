@@ -67,7 +67,6 @@ const getRepoRemoteUrlMock: jest.Mock<any, any, any> = jest.fn();
 const getRemoteDetailMock: jest.Mock<any, any, any> = jest.fn();
 const getWorkingBaseAndTypeMock: jest.Mock<any, any, any> = jest.fn();
 const stashPushMock: jest.Mock<any, any, any> = jest.fn();
-const fetchRemoteMock: jest.Mock<any, any, any> = jest.fn();
 const checkoutMock: jest.Mock<any, any, any> = jest.fn();
 const pullMock: jest.Mock<any, any, any> = jest.fn();
 const fetchMock: jest.Mock<any, any, any> = jest.fn();
@@ -79,6 +78,7 @@ const stashPopMock: jest.Mock<any, any, any> = jest.fn();
 const commitsAheadMock: jest.Mock<any, any, any> = jest.fn();
 const hasDiffMock: jest.Mock<any, any, any> = jest.fn();
 const isEvenMock: jest.Mock<any, any, any> = jest.fn();
+const fetchAllMock: jest.Mock<any, any, any> = jest.fn();
 jest.mock('../src/git-command-manager', () => {
   return {
     ...jest.requireActual('../src/git-command-manager'),
@@ -89,7 +89,6 @@ jest.mock('../src/git-command-manager', () => {
         getRemoteDetail: getRemoteDetailMock,
         getWorkingBaseAndType: getWorkingBaseAndTypeMock,
         stashPush: stashPushMock,
-        fetchRemote: fetchRemoteMock,
         checkout: checkoutMock,
         pull: pullMock,
         fetch: fetchMock,
@@ -100,7 +99,8 @@ jest.mock('../src/git-command-manager', () => {
         stashPop: stashPopMock,
         commitsAhead: commitsAheadMock,
         hasDiff: hasDiffMock,
-        isEven: isEvenMock
+        isEven: isEvenMock,
+        fetchAll: fetchAllMock
       };
     })
   };
@@ -270,7 +270,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -315,7 +315,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -376,7 +376,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -443,7 +443,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(3);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -515,7 +515,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);

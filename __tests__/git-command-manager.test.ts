@@ -758,6 +758,42 @@ describe('Test git-command-manager.ts', (): void => {
     });
   });
 
+  describe('Test fetchAll function', (): void => {
+    const execSpy: jest.SpyInstance = jest.spyOn(exec, 'exec');
+    let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
+
+    beforeAll((): void => {
+      GitCommandManagerRealModule = jest.requireActual(
+        '../src/git-command-manager'
+      );
+    });
+
+    it('should success and use default remote value origin when remote is not given', async (): Promise<void> => {
+      fileExistsSyncMock.mockReturnValue(true);
+      const execMock: jest.SpyInstance = execSpy.mockImplementation(
+        async (gitPath: string, args: string[]): Promise<number> => {
+          if (
+            args.length === 1 &&
+            args[0] === 'fetch' &&
+            gitPath === '/usr/bin/git'
+          ) {
+            return new Promise(resolve => resolve(0));
+          }
+          return new Promise(resolve => resolve(1));
+        }
+      );
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      await gitCommandManager.fetchAll();
+
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Test isAhead function', (): void => {
     const execSpy: jest.SpyInstance = jest.spyOn(exec, 'exec');
     let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
