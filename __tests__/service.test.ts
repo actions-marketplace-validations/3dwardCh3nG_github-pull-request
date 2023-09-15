@@ -265,7 +265,7 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(4);
+        expect(infoMock).toHaveBeenCalledTimes(5);
         expect(startGroupMock).toHaveBeenCalledTimes(4);
         expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
@@ -310,7 +310,7 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(4);
+        expect(infoMock).toHaveBeenCalledTimes(5);
         expect(startGroupMock).toHaveBeenCalledTimes(2);
         expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
@@ -371,7 +371,7 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(5);
+        expect(infoMock).toHaveBeenCalledTimes(6);
         expect(startGroupMock).toHaveBeenCalledTimes(4);
         expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
@@ -391,8 +391,8 @@ describe('Test service.ts', (): void => {
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
           action: 'updated',
-          sourceBranch: 'source-branch',
-          targetBranch: 'source-branch-merge-to-target-branch',
+          sourceBranch: 'source-branch-merge-to-target-branch',
+          targetBranch: 'target-branch',
           hasDiffWithTargetBranch: true,
           headSha: 'sha'
         } as ICreateOrUpdatePullRequestBranchResult);
@@ -438,7 +438,7 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(5);
+        expect(infoMock).toHaveBeenCalledTimes(6);
         expect(startGroupMock).toHaveBeenCalledTimes(3);
         expect(endGroupMock).toHaveBeenCalledTimes(3);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
@@ -458,8 +458,8 @@ describe('Test service.ts', (): void => {
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
           action: 'not-updated',
-          sourceBranch: 'source-branch',
-          targetBranch: 'source-branch-merge-to-target-branch',
+          sourceBranch: 'source-branch-merge-to-target-branch',
+          targetBranch: 'target-branch',
           hasDiffWithTargetBranch: true,
           headSha: 'sha'
         } as ICreateOrUpdatePullRequestBranchResult);
@@ -510,7 +510,7 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(5);
+        expect(infoMock).toHaveBeenCalledTimes(6);
         expect(startGroupMock).toHaveBeenCalledTimes(3);
         expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
@@ -530,8 +530,8 @@ describe('Test service.ts', (): void => {
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
           action: 'not-updated',
-          sourceBranch: 'source-branch',
-          targetBranch: 'source-branch-merge-to-target-branch',
+          sourceBranch: 'source-branch-merge-to-target-branch',
+          targetBranch: 'target-branch',
           hasDiffWithTargetBranch: true,
           headSha: 'sha'
         } as ICreateOrUpdatePullRequestBranchResult);

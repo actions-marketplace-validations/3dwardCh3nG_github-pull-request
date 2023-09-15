@@ -14992,18 +14992,19 @@ class Service {
             headSha: ''
         };
         const workingBaseAndType = await git.getWorkingBaseAndType();
+        core.info(`Working base is ${workingBaseAndType.workingBaseType} '${workingBaseAndType.workingBase}'`);
         const stashed = await git.stashPush(['--include-untracked']);
-        if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
-            await git.fetchRemote([`${this.inputs.TARGET_BRANCH_NAME}:${this.inputs.TARGET_BRANCH_NAME}`], this.inputs.REMOTE_NAME, ['--force']);
-            await git.checkout(this.inputs.TARGET_BRANCH_NAME);
-            await git.pull([this.inputs.REMOTE_NAME, this.inputs.TARGET_BRANCH_NAME]);
+        if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
+            await git.fetchRemote([`${this.inputs.SOURCE_BRANCH_NAME}:${this.inputs.SOURCE_BRANCH_NAME}`], this.inputs.REMOTE_NAME, ['--force']);
+            await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
+            await git.pull([this.inputs.REMOTE_NAME, this.inputs.SOURCE_BRANCH_NAME]);
         }
         const tempBranch = (0, uuid_1.v4)();
         await git.checkout(tempBranch, 'HEAD');
         let pullRequestBranchName = this.inputs.SOURCE_BRANCH_NAME;
         if (this.inputs.REQUIRE_MIDDLE_BRANCH) {
             pullRequestBranchName = `${this.inputs.SOURCE_BRANCH_NAME}-merge-to-${this.inputs.TARGET_BRANCH_NAME}`;
-            result.targetBranch = pullRequestBranchName;
+            result.sourceBranch = pullRequestBranchName;
         }
         if (!(await git.fetch(this.inputs.REMOTE_NAME, pullRequestBranchName))) {
             core.info(`Pull request branch '${pullRequestBranchName}' does not exist yet.`);
