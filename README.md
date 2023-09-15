@@ -75,9 +75,9 @@ Please follow below to see all the inputs for the action.
 | `target_branch`               | The name of the branch that the new Pull Request will be merged to                                    |                         |
 | `pr_title`                    | The title of the Pull Request                                                                         |                         |
 | `pr_body`                     | (Optional) The body content of the Pull Request, will use the value of the title if not provided      |                         |
-| `draft`                       | (Optional) A draft PR will be created                                                                 | Default value: false.   |
+| `draft`                       | (Optional) A draft PR will be created if set to true                                                  | Default value: false.   |
 | `require_middle_branch`       | (Optional) Will create a branch named SOURCE_BRANCH-merge-to-TARGET_BRANCH to create the Pull Request | Default value: false.   |
-| `auto_merge`                  | (Optional) Once the Pull Request has been merged, whether to merge this Pull Request automatically    | Default value: false.   |
+| `auto_merge`                  | (Optional) Once the Pull Request has been created, whether to merge this Pull Request automatically   | Default value: false.   |
 | `merge_method`                | (Optional) The merge method when merging the Pull Request, can be 'merge', 'squash' or 'rebase'       | Default value: 'merge'. |
 | `max_merge_retries`           | (Optional) When merge the Pull Request fails, the maximum number of the retry times.                  | Default value: 60.      |
 | `merge_retry_interval`        | (Optional) The interval between each retry, in seconds                                                | Default value: 60.      |
