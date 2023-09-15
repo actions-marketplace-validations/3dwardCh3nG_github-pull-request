@@ -54,26 +54,26 @@ export const prepareInputValues: () => IInputs = (): IInputs => {
 };
 
 class Inputs implements IInputs {
-  GITHUB_TOKEN: string;
-  REPO_OWNER: string;
-  REPO_NAME: string;
-  REMOTE_NAME: string;
-  SOURCE_BRANCH_NAME: string;
-  TARGET_BRANCH_NAME: string;
-  PR_TITLE: string;
-  PR_BODY: string;
-  DRAFT: boolean;
-  REQUIRE_MIDDLE_BRANCH: boolean;
-  AUTO_MERGE: boolean;
-  MERGE_METHOD: 'merge' | 'squash' | 'rebase';
-  MAX_MERGE_RETRIES: number;
-  MERGE_RETRY_INTERVAL: number;
-  MILESTONE: number | undefined;
-  ASSIGNEES: string[] | undefined;
-  REVIEWERS: string[] | undefined;
-  TEAM_REVIEWERS: string[] | undefined;
-  LABELS: string[] | undefined;
-  SIGNOFF: boolean;
+  private _GITHUB_TOKEN: string;
+  private _REPO_OWNER: string;
+  private _REPO_NAME: string;
+  private _REMOTE_NAME: string;
+  private _SOURCE_BRANCH_NAME: string;
+  private _TARGET_BRANCH_NAME: string;
+  private _PR_TITLE: string;
+  private _PR_BODY: string;
+  private _DRAFT: boolean;
+  private _REQUIRE_MIDDLE_BRANCH: boolean;
+  private _AUTO_MERGE: boolean;
+  private _MERGE_METHOD: 'merge' | 'squash' | 'rebase';
+  private _MAX_MERGE_RETRIES: number;
+  private _MERGE_RETRY_INTERVAL: number;
+  private _MILESTONE: number | undefined;
+  private _ASSIGNEES: string[] | undefined;
+  private _REVIEWERS: string[] | undefined;
+  private _TEAM_REVIEWERS: string[] | undefined;
+  private _LABELS: string[] | undefined;
+  private _SIGNOFF: boolean;
 
   constructor(
     githubToken: string,
@@ -97,32 +97,116 @@ class Inputs implements IInputs {
     labels: string[],
     signoff: boolean
   ) {
-    this.GITHUB_TOKEN = githubToken;
-    this.REPO_OWNER = repoOwner;
-    this.REPO_NAME = repoName;
-    this.REMOTE_NAME = remoteName;
-    this.SOURCE_BRANCH_NAME = sourceBranchName;
-    this.TARGET_BRANCH_NAME = targetBranchName;
-    this.PR_TITLE = prTitle;
-    this.PR_BODY = prBody;
-    this.DRAFT = draft;
-    this.REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
-    this.AUTO_MERGE = autoMerge;
-    this.MERGE_METHOD = ['merge', 'squash', 'rebase'].includes(mergeMethod)
+    this._GITHUB_TOKEN = githubToken;
+    this._REPO_OWNER = repoOwner;
+    this._REPO_NAME = repoName;
+    this._REMOTE_NAME = remoteName;
+    this._SOURCE_BRANCH_NAME = sourceBranchName;
+    this._TARGET_BRANCH_NAME = targetBranchName;
+    this._PR_TITLE = prTitle;
+    this._PR_BODY = prBody;
+    this._DRAFT = draft;
+    this._REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
+    this._AUTO_MERGE = autoMerge;
+    this._MERGE_METHOD = ['merge', 'squash', 'rebase'].includes(mergeMethod)
       ? (mergeMethod as 'merge' | 'squash' | 'rebase')
       : 'merge';
-    this.MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
-    this.MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
-    this.MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
-    this.ASSIGNEES =
+    this._MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
+    this._MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
+    this._MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
+    this._ASSIGNEES =
       assignees.length === 1 && assignees[0] === '' ? undefined : assignees;
-    this.REVIEWERS =
+    this._REVIEWERS =
       reviewers.length === 1 && reviewers[0] === '' ? undefined : reviewers;
-    this.TEAM_REVIEWERS =
+    this._TEAM_REVIEWERS =
       teamReviewers.length === 1 && teamReviewers[0] === ''
         ? undefined
         : teamReviewers;
-    this.LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
-    this.SIGNOFF = signoff;
+    this._LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
+    this._SIGNOFF = signoff;
+  }
+
+  get GITHUB_TOKEN(): string {
+    return this._GITHUB_TOKEN;
+  }
+
+  get REPO_OWNER(): string {
+    return this._REPO_OWNER;
+  }
+
+  get REPO_NAME(): string {
+    return this._REPO_NAME;
+  }
+
+  get REMOTE_NAME(): string {
+    return this._REMOTE_NAME;
+  }
+
+  get SOURCE_BRANCH_NAME(): string {
+    return this._SOURCE_BRANCH_NAME;
+  }
+
+  get TARGET_BRANCH_NAME(): string {
+    return this._TARGET_BRANCH_NAME;
+  }
+
+  get PR_TITLE(): string {
+    return this._PR_TITLE;
+  }
+
+  get PR_BODY(): string {
+    return this._PR_BODY;
+  }
+
+  set PR_BODY(value: string) {
+    this._PR_BODY = value;
+  }
+
+  get DRAFT(): boolean {
+    return this._DRAFT;
+  }
+
+  get REQUIRE_MIDDLE_BRANCH(): boolean {
+    return this._REQUIRE_MIDDLE_BRANCH;
+  }
+
+  get AUTO_MERGE(): boolean {
+    return this._AUTO_MERGE;
+  }
+
+  get MERGE_METHOD(): 'merge' | 'squash' | 'rebase' {
+    return this._MERGE_METHOD;
+  }
+
+  get MAX_MERGE_RETRIES(): number {
+    return this._MAX_MERGE_RETRIES;
+  }
+
+  get MERGE_RETRY_INTERVAL(): number {
+    return this._MERGE_RETRY_INTERVAL;
+  }
+
+  get MILESTONE(): number | undefined {
+    return this._MILESTONE;
+  }
+
+  get ASSIGNEES(): string[] | undefined {
+    return this._ASSIGNEES;
+  }
+
+  get REVIEWERS(): string[] | undefined {
+    return this._REVIEWERS;
+  }
+
+  get TEAM_REVIEWERS(): string[] | undefined {
+    return this._TEAM_REVIEWERS;
+  }
+
+  get LABELS(): string[] | undefined {
+    return this._LABELS;
+  }
+
+  get SIGNOFF(): boolean {
+    return this._SIGNOFF;
   }
 }
