@@ -374,7 +374,7 @@ describe('Test git-auth-helper.ts', (): void => {
       > = jest
         .spyOn(io, 'rmRF')
         .mockImplementation(async (inputPath: string): Promise<void> => {
-          if (inputPath === '/tmp/sshKeyPath') {
+          if (inputPath === '/usr/bin/sshKeyPath') {
             throw new Error('Test remove ssh key error');
           } else {
             return Promise.resolve();
@@ -420,7 +420,7 @@ describe('Test git-auth-helper.ts', (): void => {
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
-        .mockReturnValue('/tmp/sshKeyPath');
+        .mockReturnValue('/usr/bin/sshKeyPath');
       const execMock: jest.SpyInstance<any, any> = jest
         .spyOn(exec, 'exec')
         .mockImplementation(async (): Promise<number> => {
@@ -432,7 +432,7 @@ describe('Test git-auth-helper.ts', (): void => {
 
       // removeSsh()
       expect(rmRFMock).toHaveBeenCalledTimes(2);
-      expect(rmRFMock).toHaveBeenCalledWith('/tmp/sshKeyPath');
+      expect(rmRFMock).toHaveBeenCalledWith('/usr/bin/sshKeyPath');
       expect(rmRFMock).toHaveBeenCalledWith(
         '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts'
       );
@@ -440,7 +440,7 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(debugSpy).toHaveBeenCalledWith('Test remove ssh key error');
       expect(warningSpy).toHaveBeenCalledTimes(2);
       expect(warningSpy).toHaveBeenCalledWith(
-        "Failed to remove SSH key '/tmp/sshKeyPath'"
+        "Failed to remove SSH key '/usr/bin/sshKeyPath'"
       );
       expect(warningSpy).toHaveBeenCalledWith(
         "Failed to remove 'core.sshCommand' from the git config"
@@ -452,10 +452,10 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(whichMock).toHaveBeenCalledWith('ssh', true);
       expect(execMock).toHaveBeenCalledTimes(2);
       expect(execMock).toHaveBeenCalledWith(
-        '"C:\\Windows\\System32\\icacls.exe" "/tmp/sshKeyPath" /grant:r "userdomain\\username:F"'
+        '"C:\\Windows\\System32\\icacls.exe" "/usr/bin/sshKeyPath" /grant:r "userdomain\\username:F"'
       );
       expect(execMock).toHaveBeenCalledWith(
-        '"C:\\Windows\\System32\\icacls.exe" "/tmp/sshKeyPath" /inheritance:r'
+        '"C:\\Windows\\System32\\icacls.exe" "/usr/bin/sshKeyPath" /inheritance:r'
       );
     });
 
@@ -487,7 +487,7 @@ describe('Test git-auth-helper.ts', (): void => {
       > = jest
         .spyOn(io, 'rmRF')
         .mockImplementation(async (inputPath: string): Promise<void> => {
-          if (inputPath === '/tmp/sshKeyPath') {
+          if (inputPath === '/usr/bin/sshKeyPath') {
             /* eslint-disable-next-line no-throw-literal */
             throw 'rmRF string error';
           } else {
@@ -519,7 +519,7 @@ describe('Test git-auth-helper.ts', (): void => {
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
-        .mockReturnValue('/tmp/sshKeyPath');
+        .mockReturnValue('/usr/bin/sshKeyPath');
 
       await expect(gitAuthHelper.configureAuth()).rejects.toThrow(
         new Error('Unable to replace auth placeholder in /.git/config')
@@ -585,7 +585,7 @@ describe('Test git-auth-helper.ts', (): void => {
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
-        .mockReturnValue('/tmp/sshKeyPath');
+        .mockReturnValue('/usr/bin/sshKeyPath');
 
       await gitAuthHelper.configureAuth();
 
@@ -647,7 +647,7 @@ describe('Test git-auth-helper.ts', (): void => {
       );
       jest
         .spyOn(gitAuthHelper, 'sshKeyPath', 'get')
-        .mockReturnValue('/tmp/sshKeyPath');
+        .mockReturnValue('/usr/bin/sshKeyPath');
 
       await expect(gitAuthHelper.configureAuth()).rejects.toThrow(
         new Error('non-ENOENT error message')

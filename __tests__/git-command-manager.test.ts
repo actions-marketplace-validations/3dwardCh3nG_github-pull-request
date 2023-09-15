@@ -4,7 +4,6 @@ import {
   GitCommandManager,
   IWorkingBaseAndType
 } from '../src/git-command-manager';
-import { WorkflowUtils } from '../src/workflow-utils';
 import { ErrorMessages } from '../src/message';
 import { GitExecOutput } from '../src/git-exec-output';
 
@@ -28,7 +27,6 @@ jest.mock('../src/git-command-manager', () => {
   return {
     ...jest.requireActual('../src/git-command-manager'),
     GitCommandManager: jest.fn().mockImplementation(() => {
-      new WorkflowUtils();
       return {
         init: initMock
       };
@@ -78,7 +76,6 @@ describe('Test git-command-manager.ts', (): void => {
       expect(gitCommandManager).toBeDefined();
       expect(GitCommandManager).toHaveBeenCalledTimes(1);
       expect(initMock).toHaveBeenCalledTimes(1);
-      expect(WorkflowUtils).toHaveBeenCalledTimes(1);
     });
   });
 

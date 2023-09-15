@@ -6,7 +6,7 @@ import {
   Service
 } from '../src/service';
 import { WorkflowUtils } from '../src/workflow-utils';
-import { GithubClient, Pull } from '../src/github-client';
+import { Pull } from '../src/github-client';
 import { GitCommandManager } from '../src/git-command-manager';
 import {
   GitSourceSettings,
@@ -83,7 +83,6 @@ jest.mock('../src/git-command-manager', () => {
   return {
     ...jest.requireActual('../src/git-command-manager'),
     GitCommandManager: jest.fn().mockImplementation(() => {
-      new WorkflowUtils();
       return {
         init: initMock,
         getRepoRemoteUrl: getRepoRemoteUrlMock,
@@ -111,9 +110,7 @@ jest.mock('../src/service', () => {
     createService: jest.fn().mockImplementation((inputs: IInputs) => {
       return new Service(inputs);
     }),
-    Service: jest.fn().mockImplementation((inputs: IInputs) => {
-      new WorkflowUtils();
-      new GithubClient(inputs.GITHUB_TOKEN);
+    Service: jest.fn().mockImplementation(() => {
       return {
         createPullRequest: jest.fn(),
         mergePullRequestWithRetries: jest.fn()
@@ -183,9 +180,6 @@ describe('Test service.ts', (): void => {
       expect(service).toBeDefined();
       expect(Service).toHaveBeenCalledTimes(1);
       expect(Service).toHaveBeenCalledWith(inputs);
-      expect(WorkflowUtils).toHaveBeenCalledTimes(1);
-      expect(GithubClient).toHaveBeenCalledTimes(1);
-      expect(GithubClient).toHaveBeenCalledWith(inputs.GITHUB_TOKEN);
     });
   });
 
@@ -639,7 +633,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(0);
         expect(executeWithCustomisedMock).toHaveBeenCalledTimes(1);
         expect(createRetryHelperMock).toHaveBeenCalledTimes(1);
-        expect(WorkflowUtils).toHaveBeenCalledTimes(3);
+        expect(WorkflowUtils).toHaveBeenCalledTimes(2);
         expect(setFailedMock).toHaveBeenCalledTimes(4);
         expect(removeAuthMock).toHaveBeenCalledTimes(1);
       });
@@ -713,7 +707,7 @@ describe('Test service.ts', (): void => {
         expect(endGroupMock).toHaveBeenCalledTimes(1);
         expect(executeWithCustomisedMock).toHaveBeenCalledTimes(1);
         expect(createRetryHelperMock).toHaveBeenCalledTimes(1);
-        expect(WorkflowUtils).toHaveBeenCalledTimes(3);
+        expect(WorkflowUtils).toHaveBeenCalledTimes(2);
         expect(setFailedMock).toHaveBeenCalledTimes(1);
         expect(removeAuthMock).toHaveBeenCalledTimes(1);
         expect(result).toEqual(mergedPull);
