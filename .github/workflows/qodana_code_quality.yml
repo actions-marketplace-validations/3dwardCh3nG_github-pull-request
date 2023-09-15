@@ -11,6 +11,7 @@ on:
     branches:
       - next
       - main
+      - develop
 
 jobs:
   qodana:
