@@ -95,7 +95,7 @@ describe('Test git-command-manager.ts', (): void => {
         );
 
       expect(gitCommandManager).toBeDefined();
-      expect(infoSpy).toHaveBeenCalledTimes(1);
+      expect(infoSpy).toHaveBeenCalledTimes(2);
       expect(gitCommandManager.workingDirectory).toBe(workingDirectory);
       expect(gitCommandManager.gitPath).toBe('/usr/bin/git');
     });

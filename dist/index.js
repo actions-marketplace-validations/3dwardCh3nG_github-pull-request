@@ -13605,6 +13605,7 @@ class GitAuthHelper {
     _sshKeyPath = '';
     _sshKnownHostsPath = '';
     constructor(gitCommandManager, gitSourceSettings) {
+        core.startGroup('Starting Git Auth Helper');
         this._git = gitCommandManager;
         this._settings = gitSourceSettings;
         // Token auth header
@@ -13619,6 +13620,7 @@ class GitAuthHelper {
         if (this.settings.workflowOrganizationId) {
             this.insteadOfValues.push(`org-${this.settings.workflowOrganizationId}@github.com:`);
         }
+        core.endGroup();
     }
     async configureAuth() {
         // Remove possible previous values
@@ -13760,6 +13762,7 @@ class GitAuthHelper {
         const urlValue = url && url.trim().length > 0
             ? url
             : process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+        core.debug(`Server URL: "${urlValue}"`);
         return new url_1.URL(urlValue);
     }
     get IS_WINDOWS() {
@@ -14048,9 +14051,12 @@ class GitCommandManager {
         return output.getStdout().trim();
     }
     async init(workingDirectory) {
+        core.startGroup('Starting initialising Git Command Manager...');
         core.info(message_1.InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
         this._workingDirectory = workingDirectory;
         this._gitPath = await io.which('git', true);
+        core.info(`Git path: ${this._gitPath}`);
+        core.endGroup();
     }
     async execGit(args, ignoreReturnCode = false, silent = false) {
         const output = new git_exec_output_1.GitExecOutput();
