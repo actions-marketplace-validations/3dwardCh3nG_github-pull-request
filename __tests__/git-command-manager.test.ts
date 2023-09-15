@@ -776,11 +776,12 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 4 &&
+            args.length === 5 &&
             args[0] === 'rev-list' &&
             args[1] === '--right-only' &&
             args[2] === '--count' &&
-            args[3] === 'branch1...branch2' &&
+            args[3] === '--' &&
+            args[4] === 'branch1...branch2' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -801,7 +802,11 @@ describe('Test git-command-manager.ts', (): void => {
       const branch1: string = 'branch1';
       const branch2: string = 'branch2';
 
-      const result: boolean = await gitCommandManager.isAhead(branch1, branch2);
+      const result: boolean = await gitCommandManager.isAhead(
+        branch1,
+        branch2,
+        ['--']
+      );
 
       expect(result).toBe(true);
       expect(execMock).toHaveBeenCalledTimes(1);
@@ -865,11 +870,12 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 4 &&
+            args.length === 5 &&
             args[0] === 'rev-list' &&
             args[1] === '--left-only' &&
             args[2] === '--count' &&
-            args[3] === 'branch1...branch2' &&
+            args[3] === '--' &&
+            args[4] === 'branch1...branch2' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -892,7 +898,8 @@ describe('Test git-command-manager.ts', (): void => {
 
       const result: boolean = await gitCommandManager.isBehind(
         branch1,
-        branch2
+        branch2,
+        ['--']
       );
 
       expect(result).toBe(true);

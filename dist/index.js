@@ -13955,18 +13955,26 @@ class GitCommandManager {
         }
         await this.execGit(args);
     }
-    async isAhead(branch1, branch2) {
-        return (await this.commitsAhead(branch1, branch2)) > 0;
+    async isAhead(branch1, branch2, options) {
+        return (await this.commitsAhead(branch1, branch2, options)) > 0;
     }
-    async commitsAhead(branch1, branch2) {
-        const result = await this.revList([`${branch1}...${branch2}`], ['--right-only', '--count']);
+    async commitsAhead(branch1, branch2, options) {
+        const args = ['--right-only', '--count'];
+        if (options) {
+            args.push(...options);
+        }
+        const result = await this.revList([`${branch1}...${branch2}`], args);
         return Number(result);
     }
-    async isBehind(branch1, branch2) {
-        return (await this.commitsBehind(branch1, branch2)) > 0;
+    async isBehind(branch1, branch2, options) {
+        return (await this.commitsBehind(branch1, branch2, options)) > 0;
     }
-    async commitsBehind(branch1, branch2) {
-        const result = await this.revList([`${branch1}...${branch2}`], ['--left-only', '--count']);
+    async commitsBehind(branch1, branch2, options) {
+        const args = ['--left-only', '--count'];
+        if (options) {
+            args.push(...options);
+        }
+        const result = await this.revList([`${branch1}...${branch2}`], args);
         return Number(result);
     }
     async isEven(branch1, branch2) {
@@ -15009,7 +15017,7 @@ class Service {
         if (!(await git.fetch(this.inputs.REMOTE_NAME, pullRequestBranchName))) {
             core.info(`Pull request branch '${pullRequestBranchName}' does not exist yet.`);
             await git.checkout(pullRequestBranchName, tempBranch);
-            result.hasDiffWithTargetBranch = await git.isAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName);
+            result.hasDiffWithTargetBranch = await git.isAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName, ['--']);
             if (result.hasDiffWithTargetBranch) {
                 result.action = 'created';
                 core.info(`Created branch '${pullRequestBranchName}'`);

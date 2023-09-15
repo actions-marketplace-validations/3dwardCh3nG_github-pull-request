@@ -178,7 +178,8 @@ export class Service implements IService {
       await git.checkout(pullRequestBranchName, tempBranch);
       result.hasDiffWithTargetBranch = await git.isAhead(
         this.inputs.TARGET_BRANCH_NAME,
-        pullRequestBranchName
+        pullRequestBranchName,
+        ['--']
       );
       if (result.hasDiffWithTargetBranch) {
         result.action = 'created';

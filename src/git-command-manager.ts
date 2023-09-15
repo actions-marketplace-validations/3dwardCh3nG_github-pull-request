@@ -42,9 +42,17 @@ export interface IGitCommandManager {
     options?: string[]
   ): Promise<void>;
 
-  isAhead(branch1: string, branch2: string): Promise<boolean>;
+  isAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<boolean>;
 
-  commitsAhead(branch1: string, branch2: string): Promise<number>;
+  commitsAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<number>;
 
   isEven(branch1: string, branch2: string): Promise<boolean>;
 
@@ -222,26 +230,50 @@ export class GitCommandManager implements IGitCommandManager {
     await this.execGit(args);
   }
 
-  async isAhead(branch1: string, branch2: string): Promise<boolean> {
-    return (await this.commitsAhead(branch1, branch2)) > 0;
+  async isAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<boolean> {
+    return (await this.commitsAhead(branch1, branch2, options)) > 0;
   }
 
-  async commitsAhead(branch1: string, branch2: string): Promise<number> {
+  async commitsAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<number> {
+    const args: string[] = ['--right-only', '--count'];
+    if (options) {
+      args.push(...options);
+    }
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      ['--right-only', '--count']
+      args
     );
     return Number(result);
   }
 
-  async isBehind(branch1: string, branch2: string): Promise<boolean> {
-    return (await this.commitsBehind(branch1, branch2)) > 0;
+  async isBehind(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<boolean> {
+    return (await this.commitsBehind(branch1, branch2, options)) > 0;
   }
 
-  async commitsBehind(branch1: string, branch2: string): Promise<number> {
+  async commitsBehind(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<number> {
+    const args: string[] = ['--left-only', '--count'];
+    if (options) {
+      args.push(...options);
+    }
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      ['--left-only', '--count']
+      args
     );
     return Number(result);
   }
