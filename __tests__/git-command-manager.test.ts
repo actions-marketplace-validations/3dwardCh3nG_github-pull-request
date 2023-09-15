@@ -780,8 +780,8 @@ describe('Test git-command-manager.ts', (): void => {
             args[0] === 'rev-list' &&
             args[1] === '--right-only' &&
             args[2] === '--count' &&
-            args[3] === '--' &&
-            args[4] === 'branch1...branch2' &&
+            args[3] === 'branch1...branch2' &&
+            args[4] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -874,8 +874,8 @@ describe('Test git-command-manager.ts', (): void => {
             args[0] === 'rev-list' &&
             args[1] === '--left-only' &&
             args[2] === '--count' &&
-            args[3] === '--' &&
-            args[4] === 'branch1...branch2' &&
+            args[3] === 'branch1...branch2' &&
+            args[4] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(

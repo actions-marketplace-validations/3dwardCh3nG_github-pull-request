@@ -244,12 +244,10 @@ export class GitCommandManager implements IGitCommandManager {
     options?: string[]
   ): Promise<number> {
     const args: string[] = ['--right-only', '--count'];
-    if (options) {
-      args.push(...options);
-    }
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      args
+      args,
+      options
     );
     return Number(result);
   }
@@ -268,12 +266,10 @@ export class GitCommandManager implements IGitCommandManager {
     options?: string[]
   ): Promise<number> {
     const args: string[] = ['--left-only', '--count'];
-    if (options) {
-      args.push(...options);
-    }
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      args
+      args,
+      options
     );
     return Number(result);
   }
@@ -381,14 +377,18 @@ export class GitCommandManager implements IGitCommandManager {
 
   private async revList(
     commitExpression: string[],
+    args?: string[],
     options?: string[]
   ): Promise<string> {
-    const args: string[] = ['rev-list'];
-    if (options) {
-      args.push(...options);
+    const argArr: string[] = ['rev-list'];
+    if (args) {
+      argArr.push(...args);
     }
-    args.push(...commitExpression);
-    const output: GitExecOutput = await this.execGit(args);
+    argArr.push(...commitExpression);
+    if (options) {
+      argArr.push(...options);
+    }
+    const output: GitExecOutput = await this.execGit(argArr);
     return output.getStdout().trim();
   }
 

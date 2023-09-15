@@ -13960,10 +13960,7 @@ class GitCommandManager {
     }
     async commitsAhead(branch1, branch2, options) {
         const args = ['--right-only', '--count'];
-        if (options) {
-            args.push(...options);
-        }
-        const result = await this.revList([`${branch1}...${branch2}`], args);
+        const result = await this.revList([`${branch1}...${branch2}`], args, options);
         return Number(result);
     }
     async isBehind(branch1, branch2, options) {
@@ -13971,10 +13968,7 @@ class GitCommandManager {
     }
     async commitsBehind(branch1, branch2, options) {
         const args = ['--left-only', '--count'];
-        if (options) {
-            args.push(...options);
-        }
-        const result = await this.revList([`${branch1}...${branch2}`], args);
+        const result = await this.revList([`${branch1}...${branch2}`], args, options);
         return Number(result);
     }
     async isEven(branch1, branch2) {
@@ -14049,13 +14043,16 @@ class GitCommandManager {
     async getGitDirectory() {
         return this.revParse('--git-dir');
     }
-    async revList(commitExpression, options) {
-        const args = ['rev-list'];
-        if (options) {
-            args.push(...options);
+    async revList(commitExpression, args, options) {
+        const argArr = ['rev-list'];
+        if (args) {
+            argArr.push(...args);
         }
-        args.push(...commitExpression);
-        const output = await this.execGit(args);
+        argArr.push(...commitExpression);
+        if (options) {
+            argArr.push(...options);
+        }
+        const output = await this.execGit(argArr);
         return output.getStdout().trim();
     }
     async init(workingDirectory) {
