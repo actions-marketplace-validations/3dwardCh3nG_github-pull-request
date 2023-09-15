@@ -1,14 +1,14 @@
 import * as core from '@actions/core';
 import { Octokit } from '@octokit/core';
 import { OctokitOptions } from '@octokit/core/dist-types/types';
+import { OctokitResponse } from '@octokit/types/dist-types';
 import { IInputs } from './inputs';
 import { ICreateOrUpdatePullRequestBranchResult } from './service';
 import { restEndpointMethods } from '@octokit/plugin-rest-endpoint-methods';
 import { Api } from '@octokit/plugin-rest-endpoint-methods/dist-types/types';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
-
-const ERROR_PR_REVIEW_TOKEN_SCOPE: string =
-  'Validation Failed: "Could not resolve to a node with the global id of';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
+import * as process from 'process';
+import { ErrorMessages } from './message';
 
 export interface Repository {
   owner: string;
@@ -27,12 +27,12 @@ export interface Pull {
 export interface IGithubClient {
   preparePullRequest(
     inputs: IInputs,
-    result: ICreateOrUpdatePullRequestBranchResult,
+    result: ICreateOrUpdatePullRequestBranchResult
   ): Promise<Pull>;
 
   createOrUpdatePullRequest(
     inputs: IInputs,
-    result: ICreateOrUpdatePullRequestBranchResult,
+    result: ICreateOrUpdatePullRequestBranchResult
   ): Promise<Pull>;
 
   updateIssues(inputs: IInputs, pull: Pull): Promise<void>;
@@ -40,30 +40,26 @@ export interface IGithubClient {
   mergePullRequest(pullRequest: Pull, inputs: IInputs): Promise<Pull>;
 }
 
-export function createGithubClient(githubToken: string): IGithubClient {
-  return new GithubClient(githubToken);
-}
-
-class GithubClient implements IGithubClient {
+export class GithubClient implements IGithubClient {
   private readonly workflowUtils: IWorkflowUtils;
   private readonly octokit: InstanceType<typeof Octokit>;
   private readonly api: Api;
 
   constructor(githubToken: string) {
-    this.workflowUtils = createWorkflowUtils();
+    this.workflowUtils = new WorkflowUtils();
 
     const options: OctokitOptions = {};
     if (githubToken) {
       options.auth = `${githubToken}`;
     }
-    options.baseUrl = process.env['GITHUB_API_URL'] || 'https://api.github.com';
+    options.baseUrl = process.env['GITHUB_API_URL'] ?? 'https://api.github.com';
     this.octokit = new Octokit(options);
     this.api = restEndpointMethods(this.octokit);
   }
 
   async preparePullRequest(
     inputs: IInputs,
-    result: ICreateOrUpdatePullRequestBranchResult,
+    result: ICreateOrUpdatePullRequestBranchResult
   ): Promise<Pull> {
     const pull: Pull = await this.createOrUpdatePullRequest(inputs, result);
     await this.updateIssues(inputs, pull);
@@ -72,11 +68,11 @@ class GithubClient implements IGithubClient {
 
   async createOrUpdatePullRequest(
     inputs: IInputs,
-    result: ICreateOrUpdatePullRequestBranchResult,
+    result: ICreateOrUpdatePullRequestBranchResult
   ): Promise<Pull> {
     const repoOwner: string = inputs.REPO_OWNER;
     const repoName: string = inputs.REPO_NAME;
-    const repoBranch: string = `${repoOwner}:${result.targetBranch}`;
+    const repoBranch: string = `${repoOwner}:${result.sourceBranch}`;
     const headBranchFull: string = `${repoOwner}/${repoName}:${repoBranch}`;
 
     try {
@@ -88,7 +84,7 @@ class GithubClient implements IGithubClient {
         draft: inputs.DRAFT,
         head: repoBranch,
         head_repo: repoName,
-        base: result.targetBranch,
+        base: result.targetBranch
       });
       return {
         number: pull.number,
@@ -96,7 +92,7 @@ class GithubClient implements IGithubClient {
         html_url: pull.html_url,
         action: result.action,
         created: true,
-        merged: false,
+        merged: false
       } as Pull;
     } catch (e: unknown) {
       if (
@@ -115,17 +111,17 @@ class GithubClient implements IGithubClient {
       ...({ owner: repoOwner, repo: repoName } as Repository),
       state: 'open',
       head: headBranchFull,
-      base: result.targetBranch,
+      base: result.targetBranch
     });
     core.info(`Attempting update of pull request`);
     const { data: pull } = await this.api.rest.pulls.update({
       ...({ owner: repoOwner, repo: repoName } as Repository),
       pull_number: pulls[0].number,
       title: inputs.PR_TITLE,
-      body: inputs.PR_BODY,
+      body: inputs.PR_BODY
     });
     core.info(
-      `Updated pull request #${pull.number} (${repoBranch} => ${result.targetBranch})`,
+      `Updated pull request #${pull.number} (${repoBranch} => ${result.targetBranch})`
     );
     return {
       number: pull.number,
@@ -133,7 +129,7 @@ class GithubClient implements IGithubClient {
       html_url: pull.html_url,
       action: result.action,
       created: false,
-      merged: false,
+      merged: false
     };
   }
 
@@ -147,7 +143,7 @@ class GithubClient implements IGithubClient {
       await this.api.rest.issues.update({
         ...({ owner: repoOwner, repo: repoName } as Repository),
         issue_number: pull.number,
-        milestone: inputs.MILESTONE,
+        milestone: inputs.MILESTONE
       });
     }
 
@@ -157,7 +153,7 @@ class GithubClient implements IGithubClient {
       await this.api.rest.issues.addLabels({
         ...({ owner: repoOwner, repo: repoName } as Repository),
         issue_number: pull.number,
-        labels: inputs.LABELS,
+        labels: inputs.LABELS
       });
     }
 
@@ -167,7 +163,7 @@ class GithubClient implements IGithubClient {
       await this.api.rest.issues.addAssignees({
         ...({ owner: repoOwner, repo: repoName } as Repository),
         issue_number: pull.number,
-        assignees: inputs.ASSIGNEES,
+        assignees: inputs.ASSIGNEES
       });
     }
 
@@ -180,9 +176,9 @@ class GithubClient implements IGithubClient {
       requestReviewersParams['reviewers'] = inputs.REVIEWERS;
       core.info(`Requesting reviewers '${inputs.REVIEWERS}'`);
     }
-    if (inputs.REAM_REVIEWERS && inputs.REAM_REVIEWERS.length > 0) {
+    if (inputs.TEAM_REVIEWERS && inputs.TEAM_REVIEWERS.length > 0) {
       const teams: string[] = this.stripOrgPrefixFromTeams(
-        inputs.REAM_REVIEWERS,
+        inputs.TEAM_REVIEWERS
       );
       requestReviewersParams['team_reviewers'] = teams;
       core.info(`Requesting team reviewers '${teams}'`);
@@ -192,17 +188,15 @@ class GithubClient implements IGithubClient {
         await this.api.rest.pulls.requestReviewers({
           ...({ owner: repoOwner, repo: repoName } as Repository),
           pull_number: pull.number,
-          ...requestReviewersParams,
+          ...requestReviewersParams
         });
       } catch (e) {
         if (
           this.workflowUtils
             .getErrorMessage(e)
-            .includes(ERROR_PR_REVIEW_TOKEN_SCOPE)
+            .includes(ErrorMessages.ERROR_PR_REVIEW_TOKEN_SCOPE)
         ) {
-          core.error(
-            `Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required.`,
-          );
+          core.error(ErrorMessages.UPDATE_REVIEWER_ERROR);
         }
         throw e;
       }
@@ -213,18 +207,15 @@ class GithubClient implements IGithubClient {
     const repoOwner: string = inputs.REPO_OWNER;
     const repoName: string = inputs.REPO_NAME;
 
-    let mergeResponse: { data: any } = { data: {} };
-    try {
-      mergeResponse = await this.api.rest.pulls.merge({
-        ...({ owner: repoOwner, repo: repoName } as Repository),
-        pull_number: pullRequest.number,
-        merge_method: inputs.MERGE_METHOD,
-      });
-    } catch (e) {
-      throw e;
-    } finally {
-      pullRequest.merged = mergeResponse.data.merged;
-    }
+    const mergeResponse: OctokitResponse<
+      { sha: string; merged: boolean; message: string },
+      200
+    > = await this.api.rest.pulls.merge({
+      ...({ owner: repoOwner, repo: repoName } as Repository),
+      pull_number: pullRequest.number,
+      merge_method: inputs.MERGE_METHOD
+    });
+    pullRequest.merged = mergeResponse.data.merged;
     return pullRequest;
   }
 

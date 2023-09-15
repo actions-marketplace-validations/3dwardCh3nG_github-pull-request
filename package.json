@@ -24,8 +24,8 @@
   "scripts": {
     "bundle": "yarn format:write && yarn package",
     "ci-test": "jest --coverage --forceExit --detectOpenHandles",
-    "format:write": "prettier --write '**/*.ts'",
-    "format:check": "prettier --check '**/*.ts'",
+    "format:write": "prettier --write '**/*.ts' --config ./.prettierrc.json",
+    "format:check": "prettier --check '**/*.ts' --config ./.prettierrc.json",
     "lint": "npx eslint . -c ./.github/linters/.eslintrc.yml",
     "package": "ncc build src/index.ts --license LICENSE",
     "package:watch": "yarn package -- --watch",
@@ -42,7 +42,8 @@
       "ts"
     ],
     "testMatch": [
-      "**/*.test.ts"
+      "**/*.test.ts",
+      "**/*.test.js"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
@@ -91,9 +92,6 @@
     "typescript": "^5.2.2",
     "semantic-release": "19.0.3",
     "conventional-changelog-eslint": "3.0.9"
-  },
-  "prettier": {
-    "singleQuote": true
   },
   "release": {
     "branches": [

@@ -18,12 +18,12 @@ export interface IInputs {
   MILESTONE: number | undefined;
   ASSIGNEES: string[] | undefined;
   REVIEWERS: string[] | undefined;
-  REAM_REVIEWERS: string[] | undefined;
+  TEAM_REVIEWERS: string[] | undefined;
   LABELS: string[] | undefined;
-  SIGNOFF: boolean | undefined;
+  SIGNOFF: boolean;
 }
 
-export const prepareInputValues = (): IInputs => {
+export const prepareInputValues: () => IInputs = (): IInputs => {
   return new Inputs(
     core.getInput('github_token', { required: true }),
     core.getInput('repo_owner', { required: true }),
@@ -49,31 +49,31 @@ export const prepareInputValues = (): IInputs => {
     core.getInput('team_reviewers', { required: false }).split(','),
     core.getInput('labels', { required: false }).split(','),
     core.getInput('signoff', { required: false }).toLowerCase() === 'true' ||
-      false,
+      false
   );
 };
 
 class Inputs implements IInputs {
-  public GITHUB_TOKEN: string;
-  public REPO_OWNER: string;
-  public REPO_NAME: string;
-  public REMOTE_NAME: string;
-  public SOURCE_BRANCH_NAME: string;
-  public TARGET_BRANCH_NAME: string;
-  public PR_TITLE: string;
-  public PR_BODY: string;
-  public DRAFT: boolean;
-  public REQUIRE_MIDDLE_BRANCH: boolean;
-  public AUTO_MERGE: boolean;
-  public MERGE_METHOD: 'merge' | 'squash' | 'rebase';
-  public MAX_MERGE_RETRIES: number;
-  public MERGE_RETRY_INTERVAL: number;
-  public MILESTONE: number | undefined;
-  public ASSIGNEES: string[] | undefined;
-  public REVIEWERS: string[] | undefined;
-  public REAM_REVIEWERS: string[] | undefined;
-  public LABELS: string[] | undefined;
-  public SIGNOFF: boolean | undefined;
+  private _GITHUB_TOKEN: string;
+  private _REPO_OWNER: string;
+  private _REPO_NAME: string;
+  private _REMOTE_NAME: string;
+  private _SOURCE_BRANCH_NAME: string;
+  private _TARGET_BRANCH_NAME: string;
+  private _PR_TITLE: string;
+  private _PR_BODY: string;
+  private _DRAFT: boolean;
+  private _REQUIRE_MIDDLE_BRANCH: boolean;
+  private _AUTO_MERGE: boolean;
+  private _MERGE_METHOD: 'merge' | 'squash' | 'rebase';
+  private _MAX_MERGE_RETRIES: number;
+  private _MERGE_RETRY_INTERVAL: number;
+  private _MILESTONE: number | undefined;
+  private _ASSIGNEES: string[] | undefined;
+  private _REVIEWERS: string[] | undefined;
+  private _TEAM_REVIEWERS: string[] | undefined;
+  private _LABELS: string[] | undefined;
+  private _SIGNOFF: boolean;
 
   constructor(
     githubToken: string,
@@ -95,34 +95,118 @@ class Inputs implements IInputs {
     reviewers: string[],
     teamReviewers: string[],
     labels: string[],
-    signoff: boolean,
+    signoff: boolean
   ) {
-    this.GITHUB_TOKEN = githubToken;
-    this.REPO_OWNER = repoOwner;
-    this.REPO_NAME = repoName;
-    this.REMOTE_NAME = remoteName;
-    this.SOURCE_BRANCH_NAME = sourceBranchName;
-    this.TARGET_BRANCH_NAME = targetBranchName;
-    this.PR_TITLE = prTitle;
-    this.PR_BODY = prBody;
-    this.DRAFT = draft;
-    this.REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
-    this.AUTO_MERGE = autoMerge;
-    this.MERGE_METHOD = ('merge' || 'squash' || 'rebase').match(mergeMethod)
+    this._GITHUB_TOKEN = githubToken;
+    this._REPO_OWNER = repoOwner;
+    this._REPO_NAME = repoName;
+    this._REMOTE_NAME = remoteName;
+    this._SOURCE_BRANCH_NAME = sourceBranchName;
+    this._TARGET_BRANCH_NAME = targetBranchName;
+    this._PR_TITLE = prTitle;
+    this._PR_BODY = prBody;
+    this._DRAFT = draft;
+    this._REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
+    this._AUTO_MERGE = autoMerge;
+    this._MERGE_METHOD = ['merge', 'squash', 'rebase'].includes(mergeMethod)
       ? (mergeMethod as 'merge' | 'squash' | 'rebase')
       : 'merge';
-    this.MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
-    this.MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
-    this.MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
-    this.ASSIGNEES =
-      assignees.length === 1 && assignees[0] === '' ? assignees : undefined;
-    this.REVIEWERS =
-      reviewers.length === 1 && reviewers[0] === '' ? reviewers : undefined;
-    this.REAM_REVIEWERS =
+    this._MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
+    this._MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
+    this._MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
+    this._ASSIGNEES =
+      assignees.length === 1 && assignees[0] === '' ? undefined : assignees;
+    this._REVIEWERS =
+      reviewers.length === 1 && reviewers[0] === '' ? undefined : reviewers;
+    this._TEAM_REVIEWERS =
       teamReviewers.length === 1 && teamReviewers[0] === ''
-        ? teamReviewers
-        : undefined;
-    this.LABELS = labels.length === 1 && labels[0] === '' ? labels : undefined;
-    this.SIGNOFF = signoff;
+        ? undefined
+        : teamReviewers;
+    this._LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
+    this._SIGNOFF = signoff;
+  }
+
+  get GITHUB_TOKEN(): string {
+    return this._GITHUB_TOKEN;
+  }
+
+  get REPO_OWNER(): string {
+    return this._REPO_OWNER;
+  }
+
+  get REPO_NAME(): string {
+    return this._REPO_NAME;
+  }
+
+  get REMOTE_NAME(): string {
+    return this._REMOTE_NAME;
+  }
+
+  get SOURCE_BRANCH_NAME(): string {
+    return this._SOURCE_BRANCH_NAME;
+  }
+
+  get TARGET_BRANCH_NAME(): string {
+    return this._TARGET_BRANCH_NAME;
+  }
+
+  get PR_TITLE(): string {
+    return this._PR_TITLE;
+  }
+
+  get PR_BODY(): string {
+    return this._PR_BODY;
+  }
+
+  set PR_BODY(value: string) {
+    this._PR_BODY = value;
+  }
+
+  get DRAFT(): boolean {
+    return this._DRAFT;
+  }
+
+  get REQUIRE_MIDDLE_BRANCH(): boolean {
+    return this._REQUIRE_MIDDLE_BRANCH;
+  }
+
+  get AUTO_MERGE(): boolean {
+    return this._AUTO_MERGE;
+  }
+
+  get MERGE_METHOD(): 'merge' | 'squash' | 'rebase' {
+    return this._MERGE_METHOD;
+  }
+
+  get MAX_MERGE_RETRIES(): number {
+    return this._MAX_MERGE_RETRIES;
+  }
+
+  get MERGE_RETRY_INTERVAL(): number {
+    return this._MERGE_RETRY_INTERVAL;
+  }
+
+  get MILESTONE(): number | undefined {
+    return this._MILESTONE;
+  }
+
+  get ASSIGNEES(): string[] | undefined {
+    return this._ASSIGNEES;
+  }
+
+  get REVIEWERS(): string[] | undefined {
+    return this._REVIEWERS;
+  }
+
+  get TEAM_REVIEWERS(): string[] | undefined {
+    return this._TEAM_REVIEWERS;
+  }
+
+  get LABELS(): string[] | undefined {
+    return this._LABELS;
+  }
+
+  get SIGNOFF(): boolean {
+    return this._SIGNOFF;
   }
 }

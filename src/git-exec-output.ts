@@ -1,45 +1,69 @@
 export class GitExecOutput {
-  private exitCode: number;
-  private stdout: string[];
-  private stderr: string[];
-  private debug: string[];
+  private _exitCode: number;
+  private _stdout: string[];
+  private _stderr: string[];
+  private _debug: string[];
 
   constructor() {
-    this.exitCode = 0;
-    this.stdout = [];
-    this.stderr = [];
-    this.debug = [];
+    this._exitCode = 0;
+    this._stdout = [];
+    this._stderr = [];
+    this._debug = [];
   }
 
-  public setExitCode(exitCode: number): void {
-    this.exitCode = exitCode;
+  get exitCode(): number {
+    return this._exitCode;
   }
 
-  public getExitCode(): number {
-    return this.exitCode;
+  set exitCode(value: number) {
+    this._exitCode = value;
   }
 
-  public addStdoutLine(line: string): void {
-    this.stdout.push(line);
+  get stdout(): string[] {
+    return this._stdout;
   }
 
-  public getStdout(): string {
-    return this.stdout.join('\n');
+  set stdout(value: string[]) {
+    this._stdout = value;
   }
 
-  public addStderrLine(line: string): void {
-    this.stderr.push(line);
+  get stderr(): string[] {
+    return this._stderr;
   }
 
-  public getStderr(): string {
-    return this.stderr.join('\n');
+  set stderr(value: string[]) {
+    this._stderr = value;
   }
 
-  public addDebugLine(line: string): void {
-    this.debug.push(line);
+  get debug(): string[] {
+    return this._debug;
   }
 
-  public getDebug(): string {
-    return this.debug.join('\n');
+  set debug(value: string[]) {
+    this._debug = value;
+  }
+
+  addStdoutLine(line: string): void {
+    this._stdout.push(line);
+  }
+
+  getStdout(): string {
+    return this._stdout.join('\n');
+  }
+
+  addStderrLine(line: string): void {
+    this._stderr.push(line);
+  }
+
+  getStderr(): string {
+    return this._stderr.join('\n');
+  }
+
+  addDebugLine(line: string): void {
+    this._debug.push(line);
+  }
+
+  getDebug(): string {
+    return this._debug.join('\n');
   }
 }

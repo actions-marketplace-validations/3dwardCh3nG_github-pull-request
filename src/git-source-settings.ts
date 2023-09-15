@@ -1,69 +1,67 @@
 export interface IGitSourceSettings {
-  getRepositoryPath(): string;
-
-  getRepositoryOwner(): string;
-
-  getRepositoryName(): string;
-
-  getAuthToken(): string;
-
-  getGithubServerUrl(): string | undefined;
+  readonly repositoryPath: string;
+  readonly repositoryOwner: string;
+  readonly repositoryName: string;
+  readonly authToken: string;
+  readonly githubServerUrl: string | undefined;
+  readonly workflowOrganizationId: string | undefined;
+  readonly sshKey: string | undefined;
+  readonly sshKnownHosts: string | undefined;
+  readonly sshStrict: boolean | undefined;
+  readonly persistCredentials: boolean | undefined;
 }
 
-export function createSourceSettings(
-  repositoryPath: string,
-  repositoryOwner: string,
-  repositoryName: string,
-  authToken: string,
-  githubServerUrl: string | undefined,
-): IGitSourceSettings {
-  return new GitSourceSettings(
-    repositoryPath,
-    repositoryOwner,
-    repositoryName,
-    authToken,
-    githubServerUrl,
-  );
-}
-
-class GitSourceSettings implements IGitSourceSettings {
-  private readonly repositoryPath: string;
-  private readonly repositoryOwner: string;
-  private readonly repositoryName: string;
-  private readonly authToken: string;
-  private readonly githubServerUrl: string | undefined;
-
+export class GitSourceSettings implements IGitSourceSettings {
   constructor(
-    repositoryPath: string,
-    repositoryOwner: string,
-    repositoryName: string,
-    authToken: string,
-    githubServerUrl: string | undefined,
-  ) {
-    this.repositoryPath = repositoryPath;
-    this.repositoryOwner = repositoryOwner;
-    this.repositoryName = repositoryName;
-    this.authToken = authToken;
-    this.githubServerUrl = githubServerUrl;
+    private readonly _repositoryPath: string,
+    private readonly _repositoryOwner: string,
+    private readonly _repositoryName: string,
+    private readonly _authToken: string,
+    private readonly _githubServerUrl: string | undefined,
+    private readonly _workflowOrganizationId: string | undefined,
+    private readonly _sshKey: string | undefined,
+    private readonly _sshKnownHosts: string | undefined,
+    private readonly _sshStrict: boolean | undefined,
+    private readonly _persistCredentials: boolean | undefined
+  ) {}
+
+  get repositoryPath(): string {
+    return this._repositoryPath;
   }
 
-  public getRepositoryPath(): string {
-    return this.repositoryPath;
+  get repositoryOwner(): string {
+    return this._repositoryOwner;
   }
 
-  public getRepositoryOwner(): string {
-    return this.repositoryOwner;
+  get repositoryName(): string {
+    return this._repositoryName;
   }
 
-  public getRepositoryName(): string {
-    return this.repositoryName;
+  get authToken(): string {
+    return this._authToken;
   }
 
-  public getAuthToken(): string {
-    return this.authToken;
+  get githubServerUrl(): string | undefined {
+    return this._githubServerUrl;
   }
 
-  public getGithubServerUrl(): string | undefined {
-    return this.githubServerUrl;
+  get workflowOrganizationId(): string | undefined {
+    return this._workflowOrganizationId;
+  }
+
+  get sshKey(): string | undefined {
+    return this._sshKey;
+  }
+
+  get sshKnownHosts(): string | undefined {
+    return this._sshKnownHosts;
+  }
+
+  get sshStrict(): boolean | undefined {
+    return this._sshStrict;
+  }
+
+  get persistCredentials(): boolean | undefined {
+    return this._persistCredentials;
   }
 }

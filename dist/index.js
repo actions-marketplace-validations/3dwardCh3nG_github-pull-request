@@ -13546,7 +13546,7 @@ function wrappy (fn, cb) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Constants = void 0;
 exports.Constants = {
-    TOKEN_PLACEHOLDER_CONFIG_VALUE: `AUTHORIZATION: basic ***`,
+    TOKEN_PLACEHOLDER_CONFIG_VALUE: `AUTHORIZATION: basic ***`
 };
 
 
@@ -13581,83 +13581,221 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createAuthHelper = void 0;
-const core = __importStar(__nccwpck_require__(2186));
-const constants_1 = __nccwpck_require__(9042);
-const path = __importStar(__nccwpck_require__(1017));
+exports.GitAuthHelper = exports.createAuthHelper = void 0;
 const assert = __importStar(__nccwpck_require__(9491));
+const core = __importStar(__nccwpck_require__(2186));
+const exec = __importStar(__nccwpck_require__(1514));
 const fs = __importStar(__nccwpck_require__(7147));
-const message_1 = __nccwpck_require__(7899);
+const io = __importStar(__nccwpck_require__(7436));
+const os = __importStar(__nccwpck_require__(2037));
+const path = __importStar(__nccwpck_require__(1017));
+const url_1 = __nccwpck_require__(7310);
+const core_1 = __nccwpck_require__(2186);
+const uuid_1 = __nccwpck_require__(5840);
+const constants_1 = __nccwpck_require__(9042);
+const IS_WINDOWS = process.platform === 'win32';
+const SSH_COMMAND_KEY = 'core.sshCommand';
 function createAuthHelper(git, settings) {
     return new GitAuthHelper(git, settings);
 }
 exports.createAuthHelper = createAuthHelper;
 class GitAuthHelper {
-    git;
-    settings;
-    tokenConfigKey = '';
-    tokenConfigValue = '';
-    constructor(git, settings) {
-        this.git = git;
-        this.settings = settings || {};
-        this.init();
+    _git;
+    _settings;
+    _tokenConfigKey;
+    _tokenConfigValue;
+    _insteadOfKey;
+    _insteadOfValues = [];
+    _sshCommand = '';
+    _sshKeyPath = '';
+    _sshKnownHostsPath = '';
+    constructor(gitCommandManager, gitSourceSettings) {
+        this._git = gitCommandManager;
+        this._settings = gitSourceSettings;
+        // Token auth header
+        const serverUrl = this.getServerUrl(this._settings.githubServerUrl);
+        this._tokenConfigKey = `http.${serverUrl.origin}/.extraheader`; // "origin" is SCHEME://HOSTNAME[:PORT]
+        const basicCredential = Buffer.from(`x-access-token:${this._settings.authToken}`, 'utf8').toString('base64');
+        core.setSecret(basicCredential);
+        this._tokenConfigValue = `AUTHORIZATION: basic ${basicCredential}`;
+        // Instead of SSH URL
+        this._insteadOfKey = `url.${serverUrl.origin}/.insteadOf`; // "origin" is SCHEME://HOSTNAME[:PORT]
+        this._insteadOfValues.push(`git@${serverUrl.hostname}:`);
+        if (this._settings.workflowOrganizationId) {
+            this._insteadOfValues.push(`org-${this._settings.workflowOrganizationId}@github.com:`);
+        }
     }
     async configureAuth() {
+        // Remove possible previous values
         await this.removeAuth();
+        // Configure new values
+        await this.configureSsh();
         await this.configureToken();
     }
     async removeAuth() {
+        await this.removeSsh();
         await this.removeToken();
     }
-    init() {
-        const serverUrl = this.getServerUrl(this.settings.getGithubServerUrl());
-        this.tokenConfigKey = `http.${serverUrl.origin}/.extraheader`;
-        const basicCredential = Buffer.from(`x-access-token:${this.settings.getAuthToken()}`, 'utf8').toString('base64');
-        core.setSecret(basicCredential);
-        this.tokenConfigValue = `AUTHORIZATION: basic ${basicCredential}`;
-    }
-    getServerUrl(url) {
-        let urlValue = url && url.trim().length > 0
-            ? url
-            : process.env['GITHUB_SERVER_URL'] || 'https://github.com';
-        return new URL(urlValue);
-    }
-    async removeToken() {
-        // HTTP extra header
-        await this.removeGitConfig(this.tokenConfigKey);
+    async configureSsh() {
+        if (!this._settings.sshKey) {
+            return;
+        }
+        // Write key
+        const runnerTemp = process.env['RUNNER_TEMP'] || '';
+        assert.ok(runnerTemp, 'RUNNER_TEMP is not defined');
+        const uniqueId = (0, uuid_1.v4)();
+        this._sshKeyPath = path.join(runnerTemp, uniqueId);
+        this.setState('sshKeyPath', this._sshKeyPath);
+        await fs.promises.mkdir(runnerTemp, { recursive: true });
+        await fs.promises.writeFile(this._sshKeyPath, `${this._settings.sshKey.trim()}\n`, { mode: 0o600 });
+        // Remove inherited permissions on Windows
+        if (IS_WINDOWS) {
+            const icacls = await io.which('icacls.exe');
+            await exec.exec(`"${icacls}" "${this._sshKeyPath}" /grant:r "${process.env['USERDOMAIN']}\\${process.env['USERNAME']}:F"`);
+            await exec.exec(`"${icacls}" "${this._sshKeyPath}" /inheritance:r`);
+        }
+        // Write known hosts
+        const userKnownHostsPath = path.join(os.homedir(), '.ssh', 'known_hosts');
+        let userKnownHosts = '';
+        try {
+            userKnownHosts = (await fs.promises.readFile(userKnownHostsPath)).toString();
+        }
+        catch (err) {
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            if (err?.code !== 'ENOENT') {
+                throw err;
+            }
+        }
+        let knownHosts = '';
+        if (userKnownHosts) {
+            knownHosts += `# Begin from ${userKnownHostsPath}\n${userKnownHosts}\n# End from ${userKnownHostsPath}\n`;
+        }
+        if (this._settings.sshKnownHosts) {
+            knownHosts += `# Begin from input known hosts\n${this._settings.sshKnownHosts}\n# end from input known hosts\n`;
+        }
+        knownHosts += `# Begin implicitly added github.com\ngithub.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=\n# End implicitly added github.com\n`;
+        this._sshKnownHostsPath = path.join(runnerTemp, `${uniqueId}_known_hosts`);
+        this.setState('sshKnownHostsPath', this._sshKnownHostsPath);
+        await fs.promises.writeFile(this._sshKnownHostsPath, knownHosts);
+        // Configure GIT_SSH_COMMAND
+        const sshPath = await io.which('ssh', true);
+        this._sshCommand = `"${sshPath}" -i "$RUNNER_TEMP/${path.basename(this._sshKeyPath)}"`;
+        if (this._settings.sshStrict) {
+            this._sshCommand += ' -o StrictHostKeyChecking=yes -o CheckHostIP=no';
+        }
+        this._sshCommand += ` -o "UserKnownHostsFile=$RUNNER_TEMP/${path.basename(this._sshKnownHostsPath)}"`;
+        core.info(`Temporarily overriding GIT_SSH_COMMAND=${this._sshCommand}`);
+        this._git.setEnvironmentVariable('GIT_SSH_COMMAND', this._sshCommand);
+        // Configure core.sshCommand
+        if (this._settings.persistCredentials) {
+            await this._git.config(SSH_COMMAND_KEY, this._sshCommand);
+        }
     }
     async configureToken(configPath, globalConfig) {
+        // Validate args
         assert.ok((configPath && globalConfig) || (!configPath && !globalConfig), 'Unexpected configureToken parameter combinations');
+        // Default config path
         if (!configPath && !globalConfig) {
-            configPath = path.join(this.git.getWorkingDirectory(), '.git', 'config');
+            configPath = path.join(this._git.getWorkingDirectory(), '.git', 'config');
         }
         // Configure a placeholder value. This approach avoids the credential being captured
         // by process creation audit events, which are commonly logged. For more information,
         // refer to https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/manage/component-updates/command-line-process-auditing
-        await this.git.config(this.tokenConfigKey, constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, globalConfig);
+        await this._git.config(this._tokenConfigKey, constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, globalConfig);
         // Replace the placeholder
         await this.replaceTokenPlaceholder(configPath || '');
     }
-    async removeGitConfig(configKey) {
-        if ((await this.git.configExists(configKey)) &&
-            !(await this.git.unsetConfig(configKey))) {
-            core.warning(`Failed to remove '${configKey}' from the git config`);
-        }
-    }
     async replaceTokenPlaceholder(configPath) {
-        assert.ok(configPath, message_1.ErrorMessages.CONFIG_PATH_IS_NOT_DEFINED);
+        assert.ok(configPath, 'configPath is not defined');
         let content = (await fs.promises.readFile(configPath)).toString();
         const placeholderIndex = content.indexOf(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE);
         if (placeholderIndex < 0 ||
-            placeholderIndex !=
+            placeholderIndex !==
                 content.lastIndexOf(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE)) {
-            throw new Error(message_1.ErrorMessages.UNABLE_TO_REPLACE_AUTH_PLACEHOLDER + configPath);
+            throw new Error(`Unable to replace auth placeholder in ${configPath}`);
         }
-        assert.ok(this.tokenConfigValue, message_1.ErrorMessages.TOKEN_CONFIG_VALUE_IS_NOT_DEFINED);
-        content = content.replace(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, this.tokenConfigValue);
+        assert.ok(this._tokenConfigValue, 'tokenConfigValue is not defined');
+        content = content.replace(constants_1.Constants.TOKEN_PLACEHOLDER_CONFIG_VALUE, this._tokenConfigValue);
         await fs.promises.writeFile(configPath, content);
     }
+    async removeSsh() {
+        // SSH key
+        const keyPath = this._sshKeyPath || (0, core_1.getState)('sshKeyPath');
+        if (keyPath) {
+            try {
+                await io.rmRF(keyPath);
+            }
+            catch (err) {
+                /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+                core.debug(`${err?.message ?? err}`);
+                core.warning(`Failed to remove SSH key '${keyPath}'`);
+            }
+        }
+        // SSH known hosts
+        const knownHostsPath = this._sshKnownHostsPath || (0, core_1.getState)('sshKnownHostsPath');
+        if (knownHostsPath) {
+            try {
+                await io.rmRF(knownHostsPath);
+            }
+            catch {
+                // Intentionally empty
+            }
+        }
+        // SSH command
+        await this.removeGitConfig(SSH_COMMAND_KEY);
+    }
+    async removeToken() {
+        // HTTP extra header
+        await this.removeGitConfig(this._tokenConfigKey);
+    }
+    async removeGitConfig(configKey) {
+        if ((await this._git.configExists(configKey)) &&
+            !(await this._git.unsetConfig(configKey))) {
+            // Load the config contents
+            core.warning(`Failed to remove '${configKey}' from the git config`);
+        }
+    }
+    setState(key, value) {
+        core.saveState(key, value);
+    }
+    getState(key) {
+        return core.getState(key);
+    }
+    getServerUrl(url) {
+        const urlValue = url && url.trim().length > 0
+            ? url
+            : process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+        return new url_1.URL(urlValue);
+    }
+    get git() {
+        return this._git;
+    }
+    get settings() {
+        return this._settings;
+    }
+    get tokenConfigKey() {
+        return this._tokenConfigKey;
+    }
+    get tokenConfigValue() {
+        return this._tokenConfigValue;
+    }
+    get insteadOfKey() {
+        return this._insteadOfKey;
+    }
+    get insteadOfValues() {
+        return this._insteadOfValues;
+    }
+    get sshCommand() {
+        return this._sshCommand;
+    }
+    get sshKeyPath() {
+        return this._sshKeyPath;
+    }
+    get sshKnownHostsPath() {
+        return this._sshKnownHostsPath;
+    }
 }
+exports.GitAuthHelper = GitAuthHelper;
 
 
 /***/ }),
@@ -13694,7 +13832,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.GitCommandManager = exports.createGitCommandManager = exports.WorkingBaseType = void 0;
+exports.GitCommandManager = exports.createGitCommandManager = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const io = __importStar(__nccwpck_require__(7436));
 const exec = __importStar(__nccwpck_require__(1514));
@@ -13703,11 +13841,6 @@ const message_1 = __nccwpck_require__(7899);
 const path_1 = __importDefault(__nccwpck_require__(1017));
 const workflow_utils_1 = __nccwpck_require__(5540);
 const tagsRefSpec = '+refs/tags/*:refs/tags/*';
-var WorkingBaseType;
-(function (WorkingBaseType) {
-    WorkingBaseType["Branch"] = "branch";
-    WorkingBaseType["Commit"] = "commit";
-})(WorkingBaseType || (exports.WorkingBaseType = WorkingBaseType = {}));
 async function createGitCommandManager(workingDirectory) {
     return await GitCommandManager.create(workingDirectory);
 }
@@ -13716,8 +13849,12 @@ class GitCommandManager {
     workflowUtils;
     gitPath = '';
     workingDirectory = '';
+    gitEnv = {
+        GIT_TERMINAL_PROMPT: '0',
+        GCM_INTERACTIVE: 'Never' // Disable prompting for git credential manager
+    };
     constructor() {
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
     }
     static async create(workingDirectory) {
         const gitCommandManager = new GitCommandManager();
@@ -13730,15 +13867,15 @@ class GitCommandManager {
     }
     getRemoteDetail(remoteUrl) {
         const githubUrl = process.env['GITHUB_SERVER_URL'] || 'https://github.com';
-        return this.githubHttpsUrlValidator(githubUrl);
+        return this.githubHttpsUrlValidator(githubUrl, remoteUrl);
     }
     async getWorkingBaseAndType() {
         const symbolicRefResult = await this.execGit(['symbolic-ref', 'HEAD', '--short'], true);
-        if (symbolicRefResult.getExitCode() == 0) {
+        if (symbolicRefResult.exitCode === 0) {
             // ref
             return {
                 workingBase: symbolicRefResult.getStdout(),
-                workingBaseType: WorkingBaseType.Branch,
+                workingBaseType: 'branch'
             };
         }
         else {
@@ -13746,7 +13883,7 @@ class GitCommandManager {
             const headSha = await this.revParse('HEAD');
             return {
                 workingBase: headSha,
-                workingBaseType: WorkingBaseType.Commit,
+                workingBaseType: 'commit'
             };
         }
     }
@@ -13764,15 +13901,6 @@ class GitCommandManager {
             args.push(...options);
         }
         await this.execGit(args);
-    }
-    async revList(commitExpression, options) {
-        const args = ['rev-list'];
-        if (options) {
-            args.push(...options);
-        }
-        args.push(...commitExpression);
-        const output = await this.execGit(args);
-        return output.getStdout().trim();
     }
     async revParse(ref, options) {
         const args = ['rev-parse'];
@@ -13806,7 +13934,7 @@ class GitCommandManager {
     }
     async fetchRemote(refSpec, remoteName, options) {
         const args = ['-c', 'protocol.version=2', 'fetch'];
-        if (!refSpec.some((x) => x === tagsRefSpec)) {
+        if (!refSpec.some(x => x === tagsRefSpec)) {
             args.push('--no-tags');
         }
         args.push('--progress', '--no-recurse-submodules');
@@ -13881,7 +14009,7 @@ class GitCommandManager {
             args.push(...options);
         }
         const output = await this.execGit(args, true);
-        return output.getExitCode() === 1;
+        return output.exitCode === 1;
     }
     async config(configKey, configValue, globalConfig, add) {
         const args = ['config', globalConfig ? '--global' : '--local'];
@@ -13897,21 +14025,33 @@ class GitCommandManager {
             globalConfig ? '--global' : '--local',
             '--name-only',
             '--get-regexp',
-            configKey,
+            configKey
         ], true);
-        return output.getExitCode() === 0;
+        return output.exitCode === 0;
     }
     async unsetConfig(configKey, globalConfig) {
         const output = await this.execGit([
             'config',
             globalConfig ? '--global' : '--local',
             '--unset-all',
-            configKey,
+            configKey
         ], true);
-        return output.getExitCode() === 0;
+        return output.exitCode === 0;
+    }
+    async getGitDirectory() {
+        return this.revParse('--git-dir');
     }
     getWorkingDirectory() {
         return this.workingDirectory;
+    }
+    async revList(commitExpression, options) {
+        const args = ['rev-list'];
+        if (options) {
+            args.push(...options);
+        }
+        args.push(...commitExpression);
+        const output = await this.execGit(args);
+        return output.getStdout().trim();
     }
     async init(workingDirectory) {
         core.info(message_1.InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
@@ -13920,12 +14060,12 @@ class GitCommandManager {
     }
     async execGit(args, ignoreReturnCode = false, silent = false) {
         const output = new git_exec_output_1.GitExecOutput();
-        const env = this.getProcessEnv();
+        const env = this.getEnvs();
         const execOptions = {
             cwd: this.workingDirectory,
             env,
-            ignoreReturnCode: ignoreReturnCode,
-            silent: silent,
+            ignoreReturnCode,
+            silent,
             listeners: {
                 stdout: (data) => {
                     output.addStdoutLine(data.toString());
@@ -13935,18 +14075,21 @@ class GitCommandManager {
                 },
                 debug: (data) => {
                     output.addDebugLine(data);
-                },
-            },
+                }
+            }
         };
         const exitCode = await exec.exec(this.gitPath, args, execOptions);
-        output.setExitCode(exitCode);
+        output.exitCode = exitCode;
         return output;
     }
-    getProcessEnv() {
+    getEnvs() {
         const env = {};
-        Object.keys(process.env).forEach((key) => {
-            env[key] = process.env[key];
-        });
+        for (const key of Object.keys(process.env)) {
+            env[key] = process.env[key] || '';
+        }
+        for (const key of Object.keys(this.gitEnv)) {
+            env[key] = this.gitEnv[key];
+        }
         return env;
     }
     urlMatcher(url) {
@@ -13958,24 +14101,30 @@ class GitCommandManager {
         return matches;
     }
     githubHttpsUrlPattern(host) {
-        return new RegExp('^https?://.*@?' + host + '/(.+/.+?)(\\.git)?$', 'i');
+        return new RegExp(`^https?://.*@?${host}/(.+/.+?)(\\.git)?$`, 'i');
     }
     githubHttpsUrlMatcher(host, url) {
         const ghHttpsUrlPattern = this.githubHttpsUrlPattern(host);
         return url.match(ghHttpsUrlPattern);
     }
-    githubHttpsUrlValidator(githubUrl) {
+    githubHttpsUrlValidator(githubUrl, remoteUrl) {
         const githubUrlMatchArray = this.urlMatcher(githubUrl);
         const host = githubUrlMatchArray[1];
-        const githubHttpsMatchArray = this.githubHttpsUrlMatcher(host, githubUrl);
+        const githubHttpsMatchArray = this.githubHttpsUrlMatcher(host, remoteUrl);
         if (githubHttpsMatchArray) {
             return {
                 hostname: host,
                 protocol: 'HTTPS',
-                repository: githubHttpsMatchArray[1],
+                repository: githubHttpsMatchArray[1]
             };
         }
         throw new Error(`The format of '${githubUrl}' is not a valid GitHub repository URL`);
+    }
+    setEnvironmentVariable(name, value) {
+        this.gitEnv[name] = value;
+    }
+    removeEnvironmentVariable(name) {
+        delete this.gitEnv[name];
     }
 }
 exports.GitCommandManager = GitCommandManager;
@@ -13991,39 +14140,57 @@ exports.GitCommandManager = GitCommandManager;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.GitExecOutput = void 0;
 class GitExecOutput {
-    exitCode;
-    stdout;
-    stderr;
-    debug;
+    _exitCode;
+    _stdout;
+    _stderr;
+    _debug;
     constructor() {
-        this.exitCode = 0;
-        this.stdout = [];
-        this.stderr = [];
-        this.debug = [];
+        this._exitCode = 0;
+        this._stdout = [];
+        this._stderr = [];
+        this._debug = [];
     }
-    setExitCode(exitCode) {
-        this.exitCode = exitCode;
+    get exitCode() {
+        return this._exitCode;
     }
-    getExitCode() {
-        return this.exitCode;
+    set exitCode(value) {
+        this._exitCode = value;
+    }
+    get stdout() {
+        return this._stdout;
+    }
+    set stdout(value) {
+        this._stdout = value;
+    }
+    get stderr() {
+        return this._stderr;
+    }
+    set stderr(value) {
+        this._stderr = value;
+    }
+    get debug() {
+        return this._debug;
+    }
+    set debug(value) {
+        this._debug = value;
     }
     addStdoutLine(line) {
-        this.stdout.push(line);
+        this._stdout.push(line);
     }
     getStdout() {
-        return this.stdout.join('\n');
+        return this._stdout.join('\n');
     }
     addStderrLine(line) {
-        this.stderr.push(line);
+        this._stderr.push(line);
     }
     getStderr() {
-        return this.stderr.join('\n');
+        return this._stderr.join('\n');
     }
     addDebugLine(line) {
-        this.debug.push(line);
+        this._debug.push(line);
     }
     getDebug() {
-        return this.debug.join('\n');
+        return this._debug.join('\n');
     }
 }
 exports.GitExecOutput = GitExecOutput;
@@ -14037,40 +14204,62 @@ exports.GitExecOutput = GitExecOutput;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createSourceSettings = void 0;
-function createSourceSettings(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl) {
-    return new GitSourceSettings(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl);
-}
-exports.createSourceSettings = createSourceSettings;
+exports.GitSourceSettings = void 0;
 class GitSourceSettings {
-    repositoryPath;
-    repositoryOwner;
-    repositoryName;
-    authToken;
-    githubServerUrl;
-    constructor(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl) {
-        this.repositoryPath = repositoryPath;
-        this.repositoryOwner = repositoryOwner;
-        this.repositoryName = repositoryName;
-        this.authToken = authToken;
-        this.githubServerUrl = githubServerUrl;
+    _repositoryPath;
+    _repositoryOwner;
+    _repositoryName;
+    _authToken;
+    _githubServerUrl;
+    _workflowOrganizationId;
+    _sshKey;
+    _sshKnownHosts;
+    _sshStrict;
+    _persistCredentials;
+    constructor(repositoryPath, repositoryOwner, repositoryName, authToken, githubServerUrl, workflowOrganizationId, sshKey, sshKnownHosts, sshStrict, persistCredentials) {
+        this._repositoryPath = repositoryPath;
+        this._repositoryOwner = repositoryOwner;
+        this._repositoryName = repositoryName;
+        this._authToken = authToken;
+        this._githubServerUrl = githubServerUrl;
+        this._workflowOrganizationId = workflowOrganizationId;
+        this._sshKey = sshKey;
+        this._sshKnownHosts = sshKnownHosts;
+        this._sshStrict = sshStrict;
+        this._persistCredentials = persistCredentials;
     }
-    getRepositoryPath() {
-        return this.repositoryPath;
+    get repositoryPath() {
+        return this._repositoryPath;
     }
-    getRepositoryOwner() {
-        return this.repositoryOwner;
+    get repositoryOwner() {
+        return this._repositoryOwner;
     }
-    getRepositoryName() {
-        return this.repositoryName;
+    get repositoryName() {
+        return this._repositoryName;
     }
-    getAuthToken() {
-        return this.authToken;
+    get authToken() {
+        return this._authToken;
     }
-    getGithubServerUrl() {
-        return this.githubServerUrl;
+    get githubServerUrl() {
+        return this._githubServerUrl;
+    }
+    get workflowOrganizationId() {
+        return this._workflowOrganizationId;
+    }
+    get sshKey() {
+        return this._sshKey;
+    }
+    get sshKnownHosts() {
+        return this._sshKnownHosts;
+    }
+    get sshStrict() {
+        return this._sshStrict;
+    }
+    get persistCredentials() {
+        return this._persistCredentials;
     }
 }
+exports.GitSourceSettings = GitSourceSettings;
 
 
 /***/ }),
@@ -14104,22 +14293,19 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createGithubClient = void 0;
+exports.GithubClient = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const core_1 = __nccwpck_require__(6762);
 const plugin_rest_endpoint_methods_1 = __nccwpck_require__(3044);
 const workflow_utils_1 = __nccwpck_require__(5540);
-const ERROR_PR_REVIEW_TOKEN_SCOPE = 'Validation Failed: "Could not resolve to a node with the global id of';
-function createGithubClient(githubToken) {
-    return new GithubClient(githubToken);
-}
-exports.createGithubClient = createGithubClient;
+const process = __importStar(__nccwpck_require__(7282));
+const message_1 = __nccwpck_require__(7899);
 class GithubClient {
     workflowUtils;
     octokit;
     api;
     constructor(githubToken) {
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
         const options = {};
         if (githubToken) {
             options.auth = `${githubToken}`;
@@ -14136,7 +14322,7 @@ class GithubClient {
     async createOrUpdatePullRequest(inputs, result) {
         const repoOwner = inputs.REPO_OWNER;
         const repoName = inputs.REPO_NAME;
-        const repoBranch = `${repoOwner}:${result.targetBranch}`;
+        const repoBranch = `${repoOwner}:${result.sourceBranch}`;
         const headBranchFull = `${repoOwner}/${repoName}:${repoBranch}`;
         try {
             core.info(`Trying to create the Pull Request`);
@@ -14147,7 +14333,7 @@ class GithubClient {
                 draft: inputs.DRAFT,
                 head: repoBranch,
                 head_repo: repoName,
-                base: result.targetBranch,
+                base: result.targetBranch
             });
             return {
                 number: pull.number,
@@ -14155,7 +14341,7 @@ class GithubClient {
                 html_url: pull.html_url,
                 action: result.action,
                 created: true,
-                merged: false,
+                merged: false
             };
         }
         catch (e) {
@@ -14173,14 +14359,14 @@ class GithubClient {
             ...{ owner: repoOwner, repo: repoName },
             state: 'open',
             head: headBranchFull,
-            base: result.targetBranch,
+            base: result.targetBranch
         });
         core.info(`Attempting update of pull request`);
         const { data: pull } = await this.api.rest.pulls.update({
             ...{ owner: repoOwner, repo: repoName },
             pull_number: pulls[0].number,
             title: inputs.PR_TITLE,
-            body: inputs.PR_BODY,
+            body: inputs.PR_BODY
         });
         core.info(`Updated pull request #${pull.number} (${repoBranch} => ${result.targetBranch})`);
         return {
@@ -14189,7 +14375,7 @@ class GithubClient {
             html_url: pull.html_url,
             action: result.action,
             created: false,
-            merged: false,
+            merged: false
         };
     }
     async updateIssues(inputs, pull) {
@@ -14201,7 +14387,7 @@ class GithubClient {
             await this.api.rest.issues.update({
                 ...{ owner: repoOwner, repo: repoName },
                 issue_number: pull.number,
-                milestone: inputs.MILESTONE,
+                milestone: inputs.MILESTONE
             });
         }
         // Apply labels
@@ -14210,7 +14396,7 @@ class GithubClient {
             await this.api.rest.issues.addLabels({
                 ...{ owner: repoOwner, repo: repoName },
                 issue_number: pull.number,
-                labels: inputs.LABELS,
+                labels: inputs.LABELS
             });
         }
         // Apply assignees
@@ -14219,7 +14405,7 @@ class GithubClient {
             await this.api.rest.issues.addAssignees({
                 ...{ owner: repoOwner, repo: repoName },
                 issue_number: pull.number,
-                assignees: inputs.ASSIGNEES,
+                assignees: inputs.ASSIGNEES
             });
         }
         // Request reviewers and team reviewers
@@ -14228,8 +14414,8 @@ class GithubClient {
             requestReviewersParams['reviewers'] = inputs.REVIEWERS;
             core.info(`Requesting reviewers '${inputs.REVIEWERS}'`);
         }
-        if (inputs.REAM_REVIEWERS && inputs.REAM_REVIEWERS.length > 0) {
-            const teams = this.stripOrgPrefixFromTeams(inputs.REAM_REVIEWERS);
+        if (inputs.TEAM_REVIEWERS && inputs.TEAM_REVIEWERS.length > 0) {
+            const teams = this.stripOrgPrefixFromTeams(inputs.TEAM_REVIEWERS);
             requestReviewersParams['team_reviewers'] = teams;
             core.info(`Requesting team reviewers '${teams}'`);
         }
@@ -14238,14 +14424,14 @@ class GithubClient {
                 await this.api.rest.pulls.requestReviewers({
                     ...{ owner: repoOwner, repo: repoName },
                     pull_number: pull.number,
-                    ...requestReviewersParams,
+                    ...requestReviewersParams
                 });
             }
             catch (e) {
                 if (this.workflowUtils
                     .getErrorMessage(e)
-                    .includes(ERROR_PR_REVIEW_TOKEN_SCOPE)) {
-                    core.error(`Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required.`);
+                    .includes(message_1.ErrorMessages.ERROR_PR_REVIEW_TOKEN_SCOPE)) {
+                    core.error(message_1.ErrorMessages.UPDATE_REVIEWER_ERROR);
                 }
                 throw e;
             }
@@ -14254,20 +14440,12 @@ class GithubClient {
     async mergePullRequest(pullRequest, inputs) {
         const repoOwner = inputs.REPO_OWNER;
         const repoName = inputs.REPO_NAME;
-        let mergeResponse = { data: {} };
-        try {
-            mergeResponse = await this.api.rest.pulls.merge({
-                ...{ owner: repoOwner, repo: repoName },
-                pull_number: pullRequest.number,
-                merge_method: inputs.MERGE_METHOD,
-            });
-        }
-        catch (e) {
-            throw e;
-        }
-        finally {
-            pullRequest.merged = mergeResponse.data.merged;
-        }
+        const mergeResponse = await this.api.rest.pulls.merge({
+            ...{ owner: repoOwner, repo: repoName },
+            pull_number: pullRequest.number,
+            merge_method: inputs.MERGE_METHOD
+        });
+        pullRequest.merged = mergeResponse.data.merged;
         return pullRequest;
     }
     stripOrgPrefixFromTeams(teams) {
@@ -14280,6 +14458,7 @@ class GithubClient {
         });
     }
 }
+exports.GithubClient = GithubClient;
 
 
 /***/ }),
@@ -14319,7 +14498,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const service_1 = __nccwpck_require__(2115);
 const inputs_1 = __nccwpck_require__(7063);
 const run = async () => {
-    const workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+    const workflowUtils = new workflow_utils_1.WorkflowUtils();
     try {
         const inputs = (0, inputs_1.prepareInputValues)();
         const service = (0, service_1.createService)(inputs);
@@ -14405,7 +14584,7 @@ class Inputs {
     MILESTONE;
     ASSIGNEES;
     REVIEWERS;
-    REAM_REVIEWERS;
+    TEAM_REVIEWERS;
     LABELS;
     SIGNOFF;
     constructor(githubToken, repoOwner, repoName, remoteName, sourceBranchName, targetBranchName, prTitle, prBody, draft, requireMiddleBranch, autoMerge, mergeMethod, maxMergeRetries, mergeRetryInterval, milestone, assignees, reviewers, teamReviewers, labels, signoff) {
@@ -14420,21 +14599,21 @@ class Inputs {
         this.DRAFT = draft;
         this.REQUIRE_MIDDLE_BRANCH = requireMiddleBranch;
         this.AUTO_MERGE = autoMerge;
-        this.MERGE_METHOD = ('merge' || 0 || 0).match(mergeMethod)
+        this.MERGE_METHOD = ['merge', 'squash', 'rebase'].includes(mergeMethod)
             ? mergeMethod
             : 'merge';
         this.MAX_MERGE_RETRIES = parseInt(maxMergeRetries);
         this.MERGE_RETRY_INTERVAL = parseInt(mergeRetryInterval);
         this.MILESTONE = milestone !== '' ? parseInt(milestone) : undefined;
         this.ASSIGNEES =
-            assignees.length === 1 && assignees[0] === '' ? assignees : undefined;
+            assignees.length === 1 && assignees[0] === '' ? undefined : assignees;
         this.REVIEWERS =
-            reviewers.length === 1 && reviewers[0] === '' ? reviewers : undefined;
-        this.REAM_REVIEWERS =
+            reviewers.length === 1 && reviewers[0] === '' ? undefined : reviewers;
+        this.TEAM_REVIEWERS =
             teamReviewers.length === 1 && teamReviewers[0] === ''
-                ? teamReviewers
-                : undefined;
-        this.LABELS = labels.length === 1 && labels[0] === '' ? labels : undefined;
+                ? undefined
+                : teamReviewers;
+        this.LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
         this.SIGNOFF = signoff;
     }
 }
@@ -14453,10 +14632,10 @@ exports.InfoMessages = {
     INITIALISING_GIT_COMMAND_MANAGER: 'Initialising Git Command Manager...',
     PR_CREATED: 'Pull Request created successfully.',
     CONFIG_AUTH_HTTPS: 'Configuring credential for HTTPS authentication',
-    PR_TARGET_REPO: 'Pull request branch target repository set to ',
+    PR_TARGET_REPO: 'Pull request branch target repository set to '
 };
 exports.WarningMessages = {
-    PR_BODY_TOO_LONG: 'The maximum size of the Pull Request body 65536 character. Your input PR body message will be truncated shorter.',
+    PR_BODY_TOO_LONG: 'The maximum size of the Pull Request body 65536 character. Your input PR body message will be truncated shorter.'
 };
 exports.ErrorMessages = {
     GITHUB_WORKSPACE_NOT_DEFINED: 'GITHUB_WORKSPACE not defined',
@@ -14464,12 +14643,144 @@ exports.ErrorMessages = {
     CONFIG_PATH_IS_NOT_DEFINED: 'configPath is not defined',
     TOKEN_CONFIG_VALUE_IS_NOT_DEFINED: 'tokenConfigValue is not defined',
     INPUT_GITHUB_TOKEN_NOT_SUPPLIED: 'Input Github Token not supplied. Unable to continue.',
-    URL_MATCHER_FAILED: 'Could not parse GitHub Server name',
+    URL_MATCHER_FAILED: 'Not a valid GitHub Service URL',
     RETRY_HELPER_MIN_SECONDS_MAX_SECONDS_ERROR: 'The minSeconds should be less than or equal to the maxSeconds',
     BRANCH_NAME_SAME_ERROR: 'The source_branch and the target_branch for a pull request must be different branches. Unable to continue.',
     TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS: 'When in the detached HEAD state, the target_branch input must be supplied.',
     TARGET_BRANCH_IS_NOT_SUPPLIED: 'When the repository is checked out on a commit instead of a branch, the target_branch input must be supplied.',
+    FILE_EXISTS_CHECK_ERROR: 'Encountered an error when checking whether path exists: ',
+    FILE_EXISTS_CHECK_INPUT_ERROR: 'Arg "filePath" must not be empty',
+    ERROR_PR_REVIEW_TOKEN_SCOPE: 'Validation Failed: Could not resolve to a node with the global id of',
+    UPDATE_REVIEWER_ERROR: "Unable to request reviewers. If requesting team reviewers a 'repo' scoped PAT is required."
 };
+
+
+/***/ }),
+
+/***/ 9791:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.executeWithCustomised = exports.executeWithDefaults = exports.createRetryHelper = void 0;
+const retry_helper_1 = __nccwpck_require__(534);
+const defaultMaxAttempts = 3;
+const defaultMinSeconds = 10;
+const defaultMaxSeconds = 20;
+function createRetryHelper(maxAttempts, minSeconds, maxSeconds, attemptsInterval) {
+    return new retry_helper_1.RetryHelper(maxAttempts, minSeconds, maxSeconds, attemptsInterval);
+}
+exports.createRetryHelper = createRetryHelper;
+async function executeWithDefaults(action) {
+    const retryHelper = createRetryHelper(defaultMaxAttempts, defaultMinSeconds, defaultMaxSeconds, undefined);
+    return await retryHelper.execute(action);
+}
+exports.executeWithDefaults = executeWithDefaults;
+async function executeWithCustomised(maxAttempts, minSeconds, maxSeconds, attemptsInterval, action) {
+    const retryHelper = createRetryHelper(maxAttempts, minSeconds, maxSeconds, attemptsInterval);
+    return await retryHelper.execute(action);
+}
+exports.executeWithCustomised = executeWithCustomised;
+
+
+/***/ }),
+
+/***/ 534:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.RetryHelper = void 0;
+const core = __importStar(__nccwpck_require__(2186));
+const message_1 = __nccwpck_require__(7899);
+const workflow_utils_1 = __nccwpck_require__(5540);
+// export class RetryHelper implements IRetryHelper {
+class RetryHelper {
+    workflowUtils;
+    maxAttempts;
+    minSeconds;
+    maxSeconds;
+    attemptsInterval;
+    constructor(maxAttempts, minSeconds, maxSeconds, attemptsInterval) {
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
+        this.maxAttempts = maxAttempts;
+        this.minSeconds =
+            minSeconds === undefined ? undefined : Math.floor(minSeconds);
+        this.maxSeconds =
+            maxSeconds === undefined ? undefined : Math.floor(maxSeconds);
+        this.attemptsInterval =
+            attemptsInterval === undefined ? undefined : Math.floor(attemptsInterval);
+        if (this.minSeconds &&
+            this.maxSeconds &&
+            this.minSeconds > this.maxSeconds) {
+            throw new Error(message_1.ErrorMessages.RETRY_HELPER_MIN_SECONDS_MAX_SECONDS_ERROR);
+        }
+    }
+    async execute(action) {
+        let attempt = 1;
+        while (attempt < this.maxAttempts) {
+            // Try
+            try {
+                return await action();
+            }
+            catch (err) {
+                core.info(this.workflowUtils.getErrorMessage(err));
+            }
+            // Sleep
+            const seconds = this.getSleepAmount();
+            core.info(`Waiting ${seconds} seconds before trying again`);
+            await this.sleep(seconds);
+            attempt++;
+        }
+        // Last attempt
+        try {
+            return await action();
+        }
+        catch (err) {
+            core.info(this.workflowUtils.getErrorMessage(err));
+            throw err;
+        }
+    }
+    getSleepAmount() {
+        if (this.attemptsInterval !== undefined) {
+            return this.attemptsInterval;
+        }
+        if (this.minSeconds === undefined || this.maxSeconds === undefined) {
+            throw Error("minSeconds and maxSeconds cannot be undefined when attemptsInterval isn't provided");
+        }
+        return (Math.floor(Math.random() * (this.maxSeconds - this.minSeconds + 1)) +
+            this.minSeconds);
+    }
+    async sleep(seconds) {
+        return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+    }
+}
+exports.RetryHelper = RetryHelper;
 
 
 /***/ }),
@@ -14512,6 +14823,7 @@ const git_auth_helper_1 = __nccwpck_require__(1893);
 const git_source_settings_1 = __nccwpck_require__(3947);
 const github_client_1 = __nccwpck_require__(5307);
 const uuid_1 = __nccwpck_require__(5840);
+const retry_helper_wrapper_1 = __nccwpck_require__(9791);
 function createService(inputs) {
     return new Service(inputs);
 }
@@ -14519,9 +14831,11 @@ exports.createService = createService;
 class Service {
     inputs;
     workflowUtils;
+    githubClient;
     constructor(inputs) {
         this.inputs = inputs;
-        this.workflowUtils = (0, workflow_utils_1.createWorkflowUtils)();
+        this.workflowUtils = new workflow_utils_1.WorkflowUtils();
+        this.githubClient = new github_client_1.GithubClient(this.inputs.GITHUB_TOKEN);
         this.inputDataChecks();
     }
     async createPullRequest() {
@@ -14534,7 +14848,7 @@ class Service {
             html_url: '',
             action: '',
             created: false,
-            merged: false,
+            merged: false
         };
         try {
             core.startGroup('Create or update the pull request branch');
@@ -14543,8 +14857,7 @@ class Service {
             await this.pushPullRequestBranch(git, result);
             if (result.hasDiffWithTargetBranch) {
                 core.startGroup('Create or update the pull request');
-                const githubClient = (0, github_client_1.createGithubClient)(this.inputs.GITHUB_TOKEN);
-                pullRequest = await githubClient.preparePullRequest(this.inputs, result);
+                pullRequest = await this.githubClient.preparePullRequest(this.inputs, result);
                 core.endGroup();
             }
         }
@@ -14559,37 +14872,29 @@ class Service {
     async mergePullRequestWithRetries(pullRequest) {
         const response = await this.prepareGitAuthentication();
         const gitAuthHelper = response.gitAuthHelper;
-        const githubClient = (0, github_client_1.createGithubClient)(this.inputs.GITHUB_TOKEN);
         let pr = {
             number: pullRequest.number,
             html_url: pullRequest.html_url,
             created: pullRequest.created,
-            merged: pullRequest.merged,
+            merged: pullRequest.merged
         };
         try {
-            pr = await this.mergePullRequest(githubClient, pr);
+            pr = await this.mergePullRequest(pr);
         }
         catch (error) {
-            let retryCount = 1;
             const maxRetries = this.inputs.MAX_MERGE_RETRIES;
             const retryInterval = this.inputs.MERGE_RETRY_INTERVAL;
-            while (retryCount <= maxRetries) {
-                core.info(`Retrying merge in ${retryInterval} seconds...`);
-                await new Promise((resolve) => setTimeout(resolve, retryInterval * 1000));
-                core.info(`Retry ${retryCount} of ${maxRetries}`);
-                pr = await this.mergePullRequest(githubClient, pr);
-                retryCount++;
-            }
+            pr = await (0, retry_helper_wrapper_1.executeWithCustomised)(maxRetries, undefined, undefined, retryInterval, async () => await this.mergePullRequest(pr));
         }
         finally {
             await gitAuthHelper.removeAuth();
         }
         return pr;
     }
-    async mergePullRequest(githubClient, pullRequest) {
+    async mergePullRequest(pullRequest) {
         try {
             core.startGroup(`Merging pull request #${pullRequest.number}`);
-            pullRequest = await githubClient.mergePullRequest(pullRequest, this.inputs);
+            pullRequest = await this.githubClient.mergePullRequest(pullRequest, this.inputs);
             core.endGroup();
         }
         catch (error) {
@@ -14604,16 +14909,15 @@ class Service {
             sourceBranch: this.inputs.SOURCE_BRANCH_NAME,
             targetBranch: this.inputs.TARGET_BRANCH_NAME,
             hasDiffWithTargetBranch: false,
-            headSha: '',
+            headSha: ''
         };
-        let workingBaseAndType;
-        workingBaseAndType = await git.getWorkingBaseAndType();
-        if (workingBaseAndType.workingBaseType == git_command_manager_1.WorkingBaseType.Commit &&
+        const workingBaseAndType = await git.getWorkingBaseAndType();
+        if (workingBaseAndType.workingBaseType === 'commit' &&
             !this.inputs.TARGET_BRANCH_NAME) {
             throw new Error(message_1.ErrorMessages.TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS);
         }
         const stashed = await git.stashPush(['--include-untracked']);
-        if (workingBaseAndType.workingBase != this.inputs.TARGET_BRANCH_NAME) {
+        if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
             await git.fetchRemote([`${this.inputs.TARGET_BRANCH_NAME}:${this.inputs.TARGET_BRANCH_NAME}`], this.inputs.REMOTE_NAME, ['--force']);
             await git.checkout(this.inputs.TARGET_BRANCH_NAME);
             await git.pull();
@@ -14643,7 +14947,7 @@ class Service {
             const tempBranchCommitsAhead = await git.commitsAhead(this.inputs.TARGET_BRANCH_NAME, tempBranch);
             const branchCommitsAhead = await git.commitsAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName);
             if ((await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
-                branchCommitsAhead != tempBranchCommitsAhead ||
+                branchCommitsAhead !== tempBranchCommitsAhead ||
                 !(tempBranchCommitsAhead > 0)) {
                 core.info(`Resetting '${pullRequestBranchName}'`);
                 await git.checkout(pullRequestBranchName, tempBranch);
@@ -14672,7 +14976,7 @@ class Service {
             await git.push([
                 '--force-with-lease',
                 this.inputs.REMOTE_NAME,
-                `${result.sourceBranch}:refs/heads/${result.sourceBranch}`,
+                `${result.sourceBranch}:refs/heads/${result.sourceBranch}`
             ]);
             core.endGroup();
         }
@@ -14680,8 +14984,8 @@ class Service {
     async prepareGitAuthentication() {
         const repoPath = this.workflowUtils.getRepoPath();
         const git = await (0, git_command_manager_1.createGitCommandManager)(repoPath);
-        const gitSourceSettings = (0, git_source_settings_1.createSourceSettings)(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.SOURCE_BRANCH_NAME, this.inputs.TARGET_BRANCH_NAME);
-        let gitAuthHelper = (0, git_auth_helper_1.createAuthHelper)(git, gitSourceSettings);
+        const gitSourceSettings = new git_source_settings_1.GitSourceSettings(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.SOURCE_BRANCH_NAME, this.inputs.TARGET_BRANCH_NAME, undefined, undefined, undefined, undefined, undefined);
+        const gitAuthHelper = new git_auth_helper_1.GitAuthHelper(git, gitSourceSettings);
         const remoteUrl = await git.getRepoRemoteUrl();
         const remoteDetail = git.getRemoteDetail(remoteUrl);
         core.info(message_1.InfoMessages.PR_TARGET_REPO + remoteDetail.repository);
@@ -14690,8 +14994,8 @@ class Service {
             await gitAuthHelper.configureAuth();
         }
         return {
-            git: git,
-            gitAuthHelper: gitAuthHelper,
+            git,
+            gitAuthHelper
         };
     }
     inputDataChecks() {
@@ -14711,7 +15015,7 @@ class Service {
         }
     }
     checkBranchNames() {
-        if (this.inputs.SOURCE_BRANCH_NAME == this.inputs.TARGET_BRANCH_NAME) {
+        if (this.inputs.SOURCE_BRANCH_NAME === this.inputs.TARGET_BRANCH_NAME) {
             throw new Error(message_1.ErrorMessages.BRANCH_NAME_SAME_ERROR);
         }
     }
@@ -14752,15 +15056,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createWorkflowUtils = void 0;
+exports.WorkflowUtils = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const path = __importStar(__nccwpck_require__(1017));
 const message_1 = __nccwpck_require__(7899);
 const fs_1 = __importDefault(__nccwpck_require__(7147));
-function createWorkflowUtils() {
-    return new WorkflowUtils();
-}
-exports.createWorkflowUtils = createWorkflowUtils;
 class WorkflowUtils {
     getRepoPath(relativePath) {
         let ghWorkspacePath = process.env['GITHUB_WORKSPACE'];
@@ -14775,19 +15075,20 @@ class WorkflowUtils {
         core.debug(`repoPath: ${repoPath}`);
         return repoPath;
     }
-    fileExistsSync(path) {
-        if (!path) {
-            throw new Error("Arg 'path' must not be empty");
+    fileExistsSync(filePath) {
+        if (!filePath) {
+            throw new Error(message_1.ErrorMessages.FILE_EXISTS_CHECK_INPUT_ERROR);
         }
         let stats;
         try {
-            stats = fs_1.default.statSync(path);
+            stats = fs_1.default.statSync(filePath);
         }
         catch (error) {
-            if (this.hasErrorCode(error) && error.code === 'ENOENT') {
+            if (this.hasErrorCode(error) &&
+                error.code === 'ENOENT') {
                 return false;
             }
-            throw new Error(`Encountered an error when checking whether path '${path}' exists: ${this.getErrorMessage(error)}`);
+            throw new Error(message_1.ErrorMessages.FILE_EXISTS_CHECK_ERROR + this.getErrorMessage(error));
         }
         return !stats.isDirectory();
     }
@@ -14800,6 +15101,7 @@ class WorkflowUtils {
         return typeof (error && error.code) === 'string';
     }
 }
+exports.WorkflowUtils = WorkflowUtils;
 
 
 /***/ }),
@@ -14889,6 +15191,14 @@ module.exports = require("os");
 
 "use strict";
 module.exports = require("path");
+
+/***/ }),
+
+/***/ 7282:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("process");
 
 /***/ }),
 

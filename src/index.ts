@@ -1,16 +1,15 @@
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 import * as core from '@actions/core';
 import { createService, IService } from './service';
 import { Pull } from './github-client';
 import { IInputs, prepareInputValues } from './inputs';
 
-export const run = async (): Promise<void> => {
-  const workflowUtils: IWorkflowUtils = createWorkflowUtils();
+export const run: () => Promise<void> = async (): Promise<void> => {
+  const workflowUtils: IWorkflowUtils = new WorkflowUtils();
 
   try {
     const inputs: IInputs = prepareInputValues();
     const service: IService = createService(inputs);
-
     let pullRequest: Pull = await service.createPullRequest();
     if (inputs.AUTO_MERGE) {
       pullRequest = await service.mergePullRequestWithRetries(pullRequest);
@@ -23,7 +22,6 @@ export const run = async (): Promise<void> => {
     core.setOutput('pull-request-created', pullRequest.created);
     core.setOutput('pull-request-head-sha', pullRequest.sha);
     core.setOutput('pull-request-merged', pullRequest.merged);
-
     core.endGroup();
   } catch (error) {
     core.setFailed(workflowUtils.getErrorMessage(error));

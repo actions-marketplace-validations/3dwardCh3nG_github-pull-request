@@ -4,14 +4,9 @@ import * as exec from '@actions/exec';
 import { GitExecOutput } from './git-exec-output';
 import { ErrorMessages, InfoMessages } from './message';
 import path from 'path';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 
 const tagsRefSpec: string = '+refs/tags/*:refs/tags/*';
-
-export enum WorkingBaseType {
-  Branch = 'branch',
-  Commit = 'commit',
-}
 
 export interface IRemoteDetail {
   hostname: string;
@@ -21,7 +16,7 @@ export interface IRemoteDetail {
 
 export interface IWorkingBaseAndType {
   workingBase: string;
-  workingBaseType: WorkingBaseType;
+  workingBaseType: 'commit' | 'branch';
 }
 
 export interface IGitCommandManager {
@@ -44,7 +39,7 @@ export interface IGitCommandManager {
   fetchRemote(
     refSpec: string[],
     remoteName?: string,
-    options?: string[],
+    options?: string[]
   ): Promise<void>;
 
   isAhead(branch1: string, branch2: string): Promise<boolean>;
@@ -67,29 +62,35 @@ export interface IGitCommandManager {
     configKey: string,
     configValue: string,
     globalConfig?: boolean,
-    add?: boolean,
+    add?: boolean
   ): Promise<void>;
 
   configExists(configKey: string, globalConfig?: boolean): Promise<boolean>;
 
   unsetConfig(configKey: string, globalConfig?: boolean): Promise<boolean>;
 
-  getWorkingDirectory(): string;
-}
+  getGitDirectory(): Promise<string>;
 
-export async function createGitCommandManager(
-  workingDirectory: string,
-): Promise<IGitCommandManager> {
-  return await GitCommandManager.create(workingDirectory);
+  setEnvironmentVariable(name: string, value: string): void;
+
+  removeEnvironmentVariable(name: string): void;
+  get workflowUtils(): IWorkflowUtils;
+  get gitPath(): string;
+  get workingDirectory(): string;
+  get gitEnv(): { [p: string]: string };
 }
 
 export class GitCommandManager implements IGitCommandManager {
-  private readonly workflowUtils: IWorkflowUtils;
-  private gitPath: string = '';
-  private workingDirectory: string = '';
+  private readonly _workflowUtils: IWorkflowUtils;
+  private _gitPath: string = '';
+  private _workingDirectory: string = '';
+  private _gitEnv: { [p: string]: string } = {
+    GIT_TERMINAL_PROMPT: '0', // Disable git prompt
+    GCM_INTERACTIVE: 'Never' // Disable prompting for git credential manager
+  };
 
-  private constructor() {
-    this.workflowUtils = createWorkflowUtils();
+  constructor() {
+    this._workflowUtils = new WorkflowUtils();
   }
 
   static async create(workingDirectory: string): Promise<GitCommandManager> {
@@ -102,34 +103,34 @@ export class GitCommandManager implements IGitCommandManager {
     const result: GitExecOutput = await this.execGit(
       ['config', '--get', 'remote.origin.url'],
       true,
-      true,
+      true
     );
     return result.getStdout().trim();
   }
 
   getRemoteDetail(remoteUrl: string): IRemoteDetail {
     const githubUrl: string =
-      process.env['GITHUB_SERVER_URL'] || 'https://github.com';
-    return this.githubHttpsUrlValidator(githubUrl);
+      process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    return this.githubHttpsUrlValidator(githubUrl, remoteUrl);
   }
 
   async getWorkingBaseAndType(): Promise<IWorkingBaseAndType> {
     const symbolicRefResult: GitExecOutput = await this.execGit(
       ['symbolic-ref', 'HEAD', '--short'],
-      true,
+      true
     );
-    if (symbolicRefResult.getExitCode() == 0) {
+    if (symbolicRefResult.exitCode === 0) {
       // ref
       return {
         workingBase: symbolicRefResult.getStdout(),
-        workingBaseType: WorkingBaseType.Branch,
+        workingBaseType: 'branch'
       } as IWorkingBaseAndType;
     } else {
       // detached HEAD
-      const headSha = await this.revParse('HEAD');
+      const headSha: string = await this.revParse('HEAD');
       return {
         workingBase: headSha,
-        workingBaseType: WorkingBaseType.Commit,
+        workingBaseType: 'commit'
       } as IWorkingBaseAndType;
     }
   }
@@ -139,7 +140,7 @@ export class GitCommandManager implements IGitCommandManager {
     if (options) {
       args.push(...options);
     }
-    const output = await this.execGit(args);
+    const output: GitExecOutput = await this.execGit(args);
     return output.getStdout().trim() !== 'No local changes to save';
   }
 
@@ -149,19 +150,6 @@ export class GitCommandManager implements IGitCommandManager {
       args.push(...options);
     }
     await this.execGit(args);
-  }
-
-  private async revList(
-    commitExpression: string[],
-    options?: string[],
-  ): Promise<string> {
-    const args: string[] = ['rev-list'];
-    if (options) {
-      args.push(...options);
-    }
-    args.push(...commitExpression);
-    const output: GitExecOutput = await this.execGit(args);
-    return output.getStdout().trim();
   }
 
   async revParse(ref: string, options?: string[]): Promise<string> {
@@ -175,7 +163,7 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   async checkout(ref: string, startPoint?: string): Promise<void> {
-    const args: string[] = ['checkout', '--progress'];
+    const args: string[] = ['checkout', '--progress', '--force'];
     if (startPoint) {
       args.push('-B', ref, startPoint);
     } else {
@@ -191,7 +179,7 @@ export class GitCommandManager implements IGitCommandManager {
       await this.fetchRemote(
         [`${branch}:refs/remotes/${remote}/${branch}`],
         remote,
-        ['--force'],
+        ['--force']
       );
       return true;
     } catch {
@@ -202,17 +190,17 @@ export class GitCommandManager implements IGitCommandManager {
   async fetchRemote(
     refSpec: string[],
     remoteName?: string,
-    options?: string[],
+    options?: string[]
   ): Promise<void> {
     const args: string[] = ['-c', 'protocol.version=2', 'fetch'];
-    if (!refSpec.some((x) => x === tagsRefSpec)) {
+    if (!refSpec.some(x => x === tagsRefSpec)) {
       args.push('--no-tags');
     }
 
     args.push('--progress', '--no-recurse-submodules');
     if (
       this.workflowUtils.fileExistsSync(
-        path.join(this.workingDirectory, '.git', 'shallow'),
+        path.join(this.workingDirectory, '.git', 'shallow')
       )
     ) {
       args.push('--unshallow');
@@ -241,7 +229,7 @@ export class GitCommandManager implements IGitCommandManager {
   async commitsAhead(branch1: string, branch2: string): Promise<number> {
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      ['--right-only', '--count'],
+      ['--right-only', '--count']
     );
     return Number(result);
   }
@@ -253,7 +241,7 @@ export class GitCommandManager implements IGitCommandManager {
   async commitsBehind(branch1: string, branch2: string): Promise<number> {
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      ['--left-only', '--count'],
+      ['--left-only', '--count']
     );
     return Number(result);
   }
@@ -295,7 +283,7 @@ export class GitCommandManager implements IGitCommandManager {
     if (options) {
       args.push(...options);
     }
-    const output = await this.execGit(args);
+    const output: GitExecOutput = await this.execGit(args);
     return output.getStdout().trim();
   }
 
@@ -304,15 +292,15 @@ export class GitCommandManager implements IGitCommandManager {
     if (options) {
       args.push(...options);
     }
-    const output = await this.execGit(args, true);
-    return output.getExitCode() === 1;
+    const output: GitExecOutput = await this.execGit(args, true);
+    return output.exitCode === 1;
   }
 
   async config(
     configKey: string,
     configValue: string,
     globalConfig?: boolean,
-    add?: boolean,
+    add?: boolean
   ): Promise<void> {
     const args: string[] = ['config', globalConfig ? '--global' : '--local'];
     if (add) {
@@ -324,61 +312,74 @@ export class GitCommandManager implements IGitCommandManager {
 
   async configExists(
     configKey: string,
-    globalConfig?: boolean,
+    globalConfig?: boolean
   ): Promise<boolean> {
-    const output = await this.execGit(
+    const output: GitExecOutput = await this.execGit(
       [
         'config',
         globalConfig ? '--global' : '--local',
         '--name-only',
         '--get-regexp',
-        configKey,
+        configKey
       ],
-      true,
+      true
     );
-    return output.getExitCode() === 0;
+    return output.exitCode === 0;
   }
 
   async unsetConfig(
     configKey: string,
-    globalConfig?: boolean,
+    globalConfig?: boolean
   ): Promise<boolean> {
     const output: GitExecOutput = await this.execGit(
       [
         'config',
         globalConfig ? '--global' : '--local',
         '--unset-all',
-        configKey,
+        configKey
       ],
-      true,
+      true
     );
-    return output.getExitCode() === 0;
+    return output.exitCode === 0;
   }
 
-  getWorkingDirectory(): string {
-    return this.workingDirectory;
+  async getGitDirectory(): Promise<string> {
+    return this.revParse('--git-dir');
   }
 
-  private async init(workingDirectory: string): Promise<void> {
+  private async revList(
+    commitExpression: string[],
+    options?: string[]
+  ): Promise<string> {
+    const args: string[] = ['rev-list'];
+    if (options) {
+      args.push(...options);
+    }
+    args.push(...commitExpression);
+    const output: GitExecOutput = await this.execGit(args);
+    return output.getStdout().trim();
+  }
+
+  async init(workingDirectory: string): Promise<void> {
     core.info(InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
-    this.workingDirectory = workingDirectory;
-    this.gitPath = await io.which('git', true);
+    this._workingDirectory = workingDirectory;
+    this._gitPath = await io.which('git', true);
   }
 
   private async execGit(
     args: string[],
-    ignoreReturnCode: boolean = false,
-    silent: boolean = false,
+    ignoreReturnCode = false,
+    silent = false
   ): Promise<GitExecOutput> {
     const output: GitExecOutput = new GitExecOutput();
 
-    const env = this.getProcessEnv();
+    const env: { [p: string]: string } = this.getEnvs();
 
     const execOptions: exec.ExecOptions = {
       cwd: this.workingDirectory,
       env,
-      ignoreReturnCode: ignoreReturnCode,
-      silent: silent,
+      ignoreReturnCode,
+      silent,
       listeners: {
         stdout: (data: Buffer) => {
           output.addStdoutLine(data.toString());
@@ -388,27 +389,30 @@ export class GitCommandManager implements IGitCommandManager {
         },
         debug: (data: string) => {
           output.addDebugLine(data);
-        },
-      },
+        }
+      }
     };
 
-    const exitCode: number = await exec.exec(this.gitPath, args, execOptions);
-    output.setExitCode(exitCode);
+    const exitCode: number = await exec.exec(this._gitPath, args, execOptions);
+    output.exitCode = exitCode;
 
     return output;
   }
 
-  private getProcessEnv(): { [key: string]: string } {
+  private getEnvs(): { [key: string]: string } {
     const env: { [key: string]: string } = {};
-    Object.keys(process.env).forEach((key) => {
+    for (const key of Object.keys(process.env)) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       env[key] = process.env[key]!;
-    });
+    }
+    for (const key of Object.keys(this._gitEnv)) {
+      env[key] = this._gitEnv[key];
+    }
     return env;
   }
 
   private urlMatcher(url: string): RegExpMatchArray {
-    const pattern: string = '/^https?:\\/\\/(.+)$/i';
-    const matches: RegExpMatchArray | null = url.match(pattern);
+    const matches: RegExpMatchArray | null = /^https?:\/\/(.+)$/i.exec(url);
     if (!matches) {
       throw new Error(ErrorMessages.URL_MATCHER_FAILED);
     }
@@ -416,31 +420,58 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   private githubHttpsUrlPattern(host: string): RegExp {
-    return new RegExp('^https?://.*@?' + host + '/(.+/.+?)(\\.git)?$', 'i');
+    return new RegExp(`^https?://.*@?${host}/(.+/.+?)(\\.git)?$`, 'i');
   }
 
   private githubHttpsUrlMatcher(
     host: string,
-    url: string,
+    url: string
   ): RegExpMatchArray | null {
     const ghHttpsUrlPattern: RegExp = this.githubHttpsUrlPattern(host);
     return url.match(ghHttpsUrlPattern);
   }
 
-  private githubHttpsUrlValidator(githubUrl: string): IRemoteDetail {
+  private githubHttpsUrlValidator(
+    githubUrl: string,
+    remoteUrl: string
+  ): IRemoteDetail {
     const githubUrlMatchArray: RegExpMatchArray = this.urlMatcher(githubUrl);
     const host: string = githubUrlMatchArray[1];
     const githubHttpsMatchArray: RegExpMatchArray | null =
-      this.githubHttpsUrlMatcher(host, githubUrl);
+      this.githubHttpsUrlMatcher(host, remoteUrl);
     if (githubHttpsMatchArray) {
       return {
         hostname: host,
         protocol: 'HTTPS',
-        repository: githubHttpsMatchArray[1],
+        repository: githubHttpsMatchArray[1]
       };
     }
     throw new Error(
-      `The format of '${githubUrl}' is not a valid GitHub repository URL`,
+      `The format of '${remoteUrl}' is not a valid GitHub repository URL`
     );
+  }
+
+  setEnvironmentVariable(name: string, value: string): void {
+    this._gitEnv[name] = value;
+  }
+
+  removeEnvironmentVariable(name: string): void {
+    delete this._gitEnv[name];
+  }
+
+  get workflowUtils(): IWorkflowUtils {
+    return this._workflowUtils;
+  }
+
+  get gitPath(): string {
+    return this._gitPath;
+  }
+
+  get workingDirectory(): string {
+    return this._workingDirectory;
+  }
+
+  get gitEnv(): { [p: string]: string } {
+    return this._gitEnv;
   }
 }

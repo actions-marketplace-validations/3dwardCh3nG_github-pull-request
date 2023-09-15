@@ -1,21 +1,18 @@
 import { IInputs } from './inputs';
 import { ErrorMessages, InfoMessages, WarningMessages } from './message';
 import * as core from '@actions/core';
-import { createWorkflowUtils, IWorkflowUtils } from './workflow-utils';
+import { IWorkflowUtils, WorkflowUtils } from './workflow-utils';
 import {
-  createGitCommandManager,
+  GitCommandManager,
   IGitCommandManager,
   IRemoteDetail,
-  IWorkingBaseAndType,
-  WorkingBaseType,
+  IWorkingBaseAndType
 } from './git-command-manager';
-import { createAuthHelper, IGitAuthHelper } from './git-auth-helper';
-import {
-  createSourceSettings,
-  IGitSourceSettings,
-} from './git-source-settings';
-import { createGithubClient, IGithubClient, Pull } from './github-client';
+import { GitAuthHelper, IGitAuthHelper } from './git-auth-helper';
+import { GitSourceSettings, IGitSourceSettings } from './git-source-settings';
+import { GithubClient, IGithubClient, Pull } from './github-client';
 import { v4 as uuidv4 } from 'uuid';
+import { executeWithCustomised } from './retry-helper-wrapper';
 
 export interface IGitPreparationResponse {
   git: IGitCommandManager;
@@ -30,22 +27,25 @@ export interface ICreateOrUpdatePullRequestBranchResult {
   headSha: string;
 }
 
-export interface IService {
-  createPullRequest(): Promise<Pull>;
-  mergePullRequestWithRetries(pullRequest: Pull): Promise<Pull>;
-}
-
 export function createService(inputs: IInputs): IService {
   return new Service(inputs);
 }
 
-class Service implements IService {
+export interface IService {
+  createPullRequest(): Promise<Pull>;
+
+  mergePullRequestWithRetries(pullRequest: Pull): Promise<Pull>;
+}
+
+export class Service implements IService {
   private readonly inputs: IInputs;
   private readonly workflowUtils: IWorkflowUtils;
+  private readonly githubClient: IGithubClient;
 
   constructor(inputs: IInputs) {
     this.inputs = inputs;
-    this.workflowUtils = createWorkflowUtils();
+    this.workflowUtils = new WorkflowUtils();
+    this.githubClient = new GithubClient(this.inputs.GITHUB_TOKEN);
     this.inputDataChecks();
   }
 
@@ -60,7 +60,7 @@ class Service implements IService {
       html_url: '',
       action: '',
       created: false,
-      merged: false,
+      merged: false
     } as Pull;
 
     try {
@@ -73,12 +73,9 @@ class Service implements IService {
 
       if (result.hasDiffWithTargetBranch) {
         core.startGroup('Create or update the pull request');
-        const githubClient: IGithubClient = createGithubClient(
-          this.inputs.GITHUB_TOKEN,
-        );
-        pullRequest = await githubClient.preparePullRequest(
+        pullRequest = await this.githubClient.preparePullRequest(
           this.inputs,
-          result,
+          result
         );
         core.endGroup();
       }
@@ -94,47 +91,37 @@ class Service implements IService {
     const response: IGitPreparationResponse =
       await this.prepareGitAuthentication();
     const gitAuthHelper: IGitAuthHelper = response.gitAuthHelper;
-    const githubClient: IGithubClient = createGithubClient(
-      this.inputs.GITHUB_TOKEN,
-    );
     let pr: Pull = {
       number: pullRequest.number,
       html_url: pullRequest.html_url,
       created: pullRequest.created,
-      merged: pullRequest.merged,
+      merged: pullRequest.merged
     } as Pull;
 
     try {
-      pr = await this.mergePullRequest(githubClient, pr);
+      pr = await this.mergePullRequest(pr);
     } catch (error) {
-      let retryCount: number = 1;
       const maxRetries: number = this.inputs.MAX_MERGE_RETRIES;
       const retryInterval: number = this.inputs.MERGE_RETRY_INTERVAL;
-
-      while (retryCount <= maxRetries) {
-        core.info(`Retrying merge in ${retryInterval} seconds...`);
-        await new Promise((resolve) =>
-          setTimeout(resolve, retryInterval * 1000),
-        );
-        core.info(`Retry ${retryCount} of ${maxRetries}`);
-        pr = await this.mergePullRequest(githubClient, pr);
-        retryCount++;
-      }
+      pr = await executeWithCustomised(
+        maxRetries,
+        undefined,
+        undefined,
+        retryInterval,
+        async (): Promise<Pull> => await this.mergePullRequest(pr)
+      );
     } finally {
       await gitAuthHelper.removeAuth();
     }
     return pr;
   }
 
-  async mergePullRequest(
-    githubClient: IGithubClient,
-    pullRequest: Pull,
-  ): Promise<Pull> {
+  async mergePullRequest(pullRequest: Pull): Promise<Pull> {
     try {
       core.startGroup(`Merging pull request #${pullRequest.number}`);
-      pullRequest = await githubClient.mergePullRequest(
+      pullRequest = await this.githubClient.mergePullRequest(
         pullRequest,
-        this.inputs,
+        this.inputs
       );
       core.endGroup();
     } catch (error) {
@@ -145,39 +132,31 @@ class Service implements IService {
   }
 
   private async preparePullRequestBranch(
-    git: IGitCommandManager,
+    git: IGitCommandManager
   ): Promise<ICreateOrUpdatePullRequestBranchResult> {
     const result: ICreateOrUpdatePullRequestBranchResult = {
       action: 'none',
       sourceBranch: this.inputs.SOURCE_BRANCH_NAME,
       targetBranch: this.inputs.TARGET_BRANCH_NAME,
       hasDiffWithTargetBranch: false,
-      headSha: '',
+      headSha: ''
     };
 
-    let workingBaseAndType: IWorkingBaseAndType;
-    workingBaseAndType = await git.getWorkingBaseAndType();
-    if (
-      workingBaseAndType.workingBaseType == WorkingBaseType.Commit &&
-      !this.inputs.TARGET_BRANCH_NAME
-    ) {
-      throw new Error(
-        ErrorMessages.TARGET_BRANCH_IS_NOT_SUPPLIED_WHEN_IN_DETACHED_HEAD_STATUS,
-      );
-    }
+    const workingBaseAndType: IWorkingBaseAndType =
+      await git.getWorkingBaseAndType();
 
-    const stashed = await git.stashPush(['--include-untracked']);
+    const stashed: boolean = await git.stashPush(['--include-untracked']);
 
-    if (workingBaseAndType.workingBase != this.inputs.TARGET_BRANCH_NAME) {
+    if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
       await git.fetchRemote(
         [`${this.inputs.TARGET_BRANCH_NAME}:${this.inputs.TARGET_BRANCH_NAME}`],
         this.inputs.REMOTE_NAME,
-        ['--force'],
+        ['--force']
       );
       await git.checkout(this.inputs.TARGET_BRANCH_NAME);
       await git.pull();
     }
-    const tempBranch = uuidv4();
+    const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
 
     let pullRequestBranchName: string = this.inputs.SOURCE_BRANCH_NAME;
@@ -188,37 +167,37 @@ class Service implements IService {
 
     if (!(await git.fetch(this.inputs.REMOTE_NAME, pullRequestBranchName))) {
       core.info(
-        `Pull request branch '${pullRequestBranchName}' does not exist yet.`,
+        `Pull request branch '${pullRequestBranchName}' does not exist yet.`
       );
       await git.checkout(pullRequestBranchName, tempBranch);
       result.hasDiffWithTargetBranch = await git.isAhead(
         this.inputs.TARGET_BRANCH_NAME,
-        pullRequestBranchName,
+        pullRequestBranchName
       );
       if (result.hasDiffWithTargetBranch) {
         result.action = 'created';
         core.info(`Created branch '${pullRequestBranchName}'`);
       } else {
         core.info(
-          `Branch '${pullRequestBranchName}' is not ahead of base '${this.inputs.TARGET_BRANCH_NAME}' and will not be created`,
+          `Branch '${pullRequestBranchName}' is not ahead of base '${this.inputs.TARGET_BRANCH_NAME}' and will not be created`
         );
       }
     } else {
       core.info(
-        `Pull request branch '${pullRequestBranchName}' already exists as remote branch '${this.inputs.REMOTE_NAME}/${pullRequestBranchName}'`,
+        `Pull request branch '${pullRequestBranchName}' already exists as remote branch '${this.inputs.REMOTE_NAME}/${pullRequestBranchName}'`
       );
       await git.checkout(pullRequestBranchName);
       const tempBranchCommitsAhead: number = await git.commitsAhead(
         this.inputs.TARGET_BRANCH_NAME,
-        tempBranch,
+        tempBranch
       );
       const branchCommitsAhead: number = await git.commitsAhead(
         this.inputs.TARGET_BRANCH_NAME,
-        pullRequestBranchName,
+        pullRequestBranchName
       );
       if (
         (await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
-        branchCommitsAhead != tempBranchCommitsAhead ||
+        branchCommitsAhead !== tempBranchCommitsAhead ||
         !(tempBranchCommitsAhead > 0)
       ) {
         core.info(`Resetting '${pullRequestBranchName}'`);
@@ -227,7 +206,7 @@ class Service implements IService {
       if (
         !(await git.isEven(
           `${this.inputs.REMOTE_NAME}/${pullRequestBranchName}`,
-          pullRequestBranchName,
+          pullRequestBranchName
         ))
       ) {
         result.action = 'updated';
@@ -235,12 +214,12 @@ class Service implements IService {
       } else {
         result.action = 'not-updated';
         core.info(
-          `Branch '${pullRequestBranchName}' is even with its remote and will not be updated`,
+          `Branch '${pullRequestBranchName}' is even with its remote and will not be updated`
         );
       }
       result.hasDiffWithTargetBranch = await git.isAhead(
         this.inputs.TARGET_BRANCH_NAME,
-        pullRequestBranchName,
+        pullRequestBranchName
       );
     }
     result.headSha = await git.revParse('HEAD');
@@ -257,16 +236,16 @@ class Service implements IService {
 
   private async pushPullRequestBranch(
     git: IGitCommandManager,
-    result: ICreateOrUpdatePullRequestBranchResult,
+    result: ICreateOrUpdatePullRequestBranchResult
   ): Promise<void> {
     if (['created', 'updated'].includes(result.action)) {
       core.startGroup(
-        `Pushing pull request branch to '${this.inputs.REMOTE_NAME}/${result.sourceBranch}'`,
+        `Pushing pull request branch to '${this.inputs.REMOTE_NAME}/${result.sourceBranch}'`
       );
       await git.push([
         '--force-with-lease',
         this.inputs.REMOTE_NAME,
-        `${result.sourceBranch}:refs/heads/${result.sourceBranch}`,
+        `${result.sourceBranch}:refs/heads/${result.sourceBranch}`
       ]);
       core.endGroup();
     }
@@ -274,17 +253,22 @@ class Service implements IService {
 
   private async prepareGitAuthentication(): Promise<IGitPreparationResponse> {
     const repoPath: string = this.workflowUtils.getRepoPath();
-    const git: IGitCommandManager = await createGitCommandManager(repoPath);
-    const gitSourceSettings: IGitSourceSettings = createSourceSettings(
+    const git: IGitCommandManager = await GitCommandManager.create(repoPath);
+    const gitSourceSettings: IGitSourceSettings = new GitSourceSettings(
       repoPath,
       this.inputs.REPO_OWNER,
       this.inputs.REPO_NAME,
       this.inputs.SOURCE_BRANCH_NAME,
       this.inputs.TARGET_BRANCH_NAME,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined
     );
-    let gitAuthHelper: IGitAuthHelper = createAuthHelper(
+    const gitAuthHelper: IGitAuthHelper = new GitAuthHelper(
       git,
-      gitSourceSettings,
+      gitSourceSettings
     );
     const remoteUrl: string = await git.getRepoRemoteUrl();
     const remoteDetail: IRemoteDetail = git.getRemoteDetail(remoteUrl);
@@ -296,21 +280,14 @@ class Service implements IService {
     }
 
     return {
-      git: git,
-      gitAuthHelper: gitAuthHelper,
+      git,
+      gitAuthHelper
     } as IGitPreparationResponse;
   }
 
   private inputDataChecks(): void {
-    this.checkGithubToken();
     this.checkBodySize();
     this.checkBranchNames();
-  }
-
-  private checkGithubToken(): void {
-    if (!this.inputs.GITHUB_TOKEN) {
-      throw new Error(ErrorMessages.INPUT_GITHUB_TOKEN_NOT_SUPPLIED);
-    }
   }
 
   private checkBodySize(): void {
@@ -321,7 +298,7 @@ class Service implements IService {
   }
 
   private checkBranchNames(): void {
-    if (this.inputs.SOURCE_BRANCH_NAME == this.inputs.TARGET_BRANCH_NAME) {
+    if (this.inputs.SOURCE_BRANCH_NAME === this.inputs.TARGET_BRANCH_NAME) {
       throw new Error(ErrorMessages.BRANCH_NAME_SAME_ERROR);
     }
   }
