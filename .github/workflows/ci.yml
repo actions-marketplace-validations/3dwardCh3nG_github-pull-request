@@ -65,6 +65,7 @@ jobs:
           pr_title: 'merge from develop'
           require_middle_branch: true
           auto_merge: true
+          max_merge_retries: 10
   release:
     name: generate-version
     runs-on: ubuntu-latest
