@@ -361,9 +361,12 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   async init(workingDirectory: string): Promise<void> {
+    core.startGroup('Starting initialising Git Command Manager...');
     core.info(InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
     this._workingDirectory = workingDirectory;
     this._gitPath = await io.which('git', true);
+    core.info(`Git path: ${this._gitPath}`);
+    core.endGroup();
   }
 
   private async execGit(

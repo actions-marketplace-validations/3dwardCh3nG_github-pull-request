@@ -44,6 +44,7 @@ export class GitAuthHelper implements IGitAuthHelper {
     gitCommandManager: IGitCommandManager,
     gitSourceSettings: IGitSourceSettings
   ) {
+    core.startGroup('Starting Git Auth Helper');
     this._git = gitCommandManager;
     this._settings = gitSourceSettings;
 
@@ -65,6 +66,7 @@ export class GitAuthHelper implements IGitAuthHelper {
         `org-${this.settings.workflowOrganizationId}@github.com:`
       );
     }
+    core.endGroup();
   }
 
   async configureAuth(): Promise<void> {
