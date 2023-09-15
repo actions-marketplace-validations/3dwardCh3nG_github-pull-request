@@ -402,7 +402,7 @@ export class GitCommandManager implements IGitCommandManager {
   private getEnvs(): { [key: string]: string } {
     const env: { [key: string]: string } = {};
     for (const key of Object.keys(process.env)) {
-      env[key] = process.env[key] || '';
+      env[key] = process.env[key] ?? '';
     }
     for (const key of Object.keys(this._gitEnv)) {
       env[key] = this._gitEnv[key];
@@ -411,7 +411,7 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   private urlMatcher(url: string): RegExpMatchArray {
-    const matches: RegExpMatchArray | null = url.match(/^https?:\/\/(.+)$/i);
+    const matches: RegExpMatchArray | null = /^https?:\/\/(.+)$/i.exec(url);
     if (!matches) {
       throw new Error(ErrorMessages.URL_MATCHER_FAILED);
     }

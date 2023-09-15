@@ -52,7 +52,7 @@ export class GithubClient implements IGithubClient {
     if (githubToken) {
       options.auth = `${githubToken}`;
     }
-    options.baseUrl = process.env['GITHUB_API_URL'] || 'https://api.github.com';
+    options.baseUrl = process.env['GITHUB_API_URL'] ?? 'https://api.github.com';
     this.octokit = new Octokit(options);
     this.api = restEndpointMethods(this.octokit);
   }

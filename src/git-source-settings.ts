@@ -12,40 +12,18 @@ export interface IGitSourceSettings {
 }
 
 export class GitSourceSettings implements IGitSourceSettings {
-  private readonly _repositoryPath: string;
-  private readonly _repositoryOwner: string;
-  private readonly _repositoryName: string;
-  private readonly _authToken: string;
-  private readonly _githubServerUrl: string | undefined;
-  private readonly _workflowOrganizationId: string | undefined;
-  private readonly _sshKey: string | undefined;
-  private readonly _sshKnownHosts: string | undefined;
-  private readonly _sshStrict: boolean | undefined;
-  private readonly _persistCredentials: boolean | undefined;
-
   constructor(
-    repositoryPath: string,
-    repositoryOwner: string,
-    repositoryName: string,
-    authToken: string,
-    githubServerUrl: string | undefined,
-    workflowOrganizationId: string | undefined,
-    sshKey: string | undefined,
-    sshKnownHosts: string | undefined,
-    sshStrict: boolean | undefined,
-    persistCredentials: boolean | undefined
-  ) {
-    this._repositoryPath = repositoryPath;
-    this._repositoryOwner = repositoryOwner;
-    this._repositoryName = repositoryName;
-    this._authToken = authToken;
-    this._githubServerUrl = githubServerUrl;
-    this._workflowOrganizationId = workflowOrganizationId;
-    this._sshKey = sshKey;
-    this._sshKnownHosts = sshKnownHosts;
-    this._sshStrict = sshStrict;
-    this._persistCredentials = persistCredentials;
-  }
+    private readonly _repositoryPath: string,
+    private readonly _repositoryOwner: string,
+    private readonly _repositoryName: string,
+    private readonly _authToken: string,
+    private readonly _githubServerUrl: string | undefined,
+    private readonly _workflowOrganizationId: string | undefined,
+    private readonly _sshKey: string | undefined,
+    private readonly _sshKnownHosts: string | undefined,
+    private readonly _sshStrict: boolean | undefined,
+    private readonly _persistCredentials: boolean | undefined
+  ) {}
 
   get repositoryPath(): string {
     return this._repositoryPath;
