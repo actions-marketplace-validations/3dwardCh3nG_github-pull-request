@@ -455,8 +455,9 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(rmRFMock).toHaveBeenCalledWith(
         '/usr/bin/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts'
       );
-      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy).toHaveBeenCalledTimes(2);
       expect(debugSpy).toHaveBeenCalledWith('Test remove ssh key error');
+      expect(debugSpy).toHaveBeenCalledWith('Server URL: "https://github.com"');
       expect(warningSpy).toHaveBeenCalledTimes(2);
       expect(warningSpy).toHaveBeenCalledWith(
         "Failed to remove SSH key '/usr/bin/sshKeyPath'"
