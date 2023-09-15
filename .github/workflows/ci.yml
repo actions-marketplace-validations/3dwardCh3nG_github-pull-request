@@ -55,7 +55,7 @@ jobs:
         uses: tj-actions/branch-names@v7.0.5
       - name: Switch to Develop branch
         run: |
-          git checkout origin develop
+          git switch develop
       - name: Test Local Action
         id: test-action-merge-develop-to-current-branch
         uses: ./
