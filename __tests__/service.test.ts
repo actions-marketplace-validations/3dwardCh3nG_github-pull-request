@@ -19,6 +19,7 @@ import { createRetryHelper } from '../src/retry-helper-wrapper';
 import { AnnotationProperties } from '@actions/core';
 import { ErrorMessages, WarningMessages } from '../src/message';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const infoMock: jest.SpyInstance<void, [message: string]> = jest.spyOn(
   core,
   'info'
@@ -124,7 +125,7 @@ const preparePullRequestMock: jest.Mock<any, any, any> = jest.fn();
 const mergePullRequestMock: jest.Mock<any, any, any> = jest.fn();
 jest.mock('../src/github-client', () => {
   return {
-    GithubClient: jest.fn().mockImplementation((githubToken: string) => {
+    GithubClient: jest.fn().mockImplementation(() => {
       return {
         preparePullRequest: preparePullRequestMock,
         mergePullRequest: mergePullRequestMock
@@ -585,7 +586,7 @@ describe('Test service.ts', (): void => {
         mergePullRequestMock.mockImplementation(() => {
           throw error;
         });
-        const executeWithCustomisedMock = jest
+        const executeWithCustomisedMock: jest.SpyInstance = jest
           .spyOn(RetryHelperWrapper, 'executeWithCustomised')
           .mockImplementation(
             async (
@@ -604,7 +605,7 @@ describe('Test service.ts', (): void => {
               return await retryHelper.execute(action);
             }
           );
-        const createRetryHelperMock = jest
+        const createRetryHelperMock: jest.SpyInstance = jest
           .spyOn(RetryHelperWrapper, 'createRetryHelper')
           .mockImplementation(
             (
@@ -661,7 +662,7 @@ describe('Test service.ts', (): void => {
         mergePullRequestMock.mockImplementationOnce(() => {
           return mergedPull;
         });
-        const executeWithCustomisedMock = jest
+        const executeWithCustomisedMock: jest.SpyInstance = jest
           .spyOn(RetryHelperWrapper, 'executeWithCustomised')
           .mockImplementation(
             async (
@@ -680,7 +681,7 @@ describe('Test service.ts', (): void => {
               return await retryHelper.execute(action);
             }
           );
-        const createRetryHelperMock = jest
+        const createRetryHelperMock: jest.SpyInstance = jest
           .spyOn(RetryHelperWrapper, 'createRetryHelper')
           .mockImplementation(
             (
@@ -746,3 +747,4 @@ function setOptionalProcessEnvValues(): void {
   process.env['INPUT_SIGNOFF'] = 'true';
   process.env['INPUT_MERGE_METHOD'] = 'squash';
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
