@@ -661,5 +661,23 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(readFileSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('Test configureToken function', (): void => {
+    it('should call removeToken and configureToken and success', async (): Promise<void> => {
+      const gitAuthHelper: any = new GitAuthHelper(
+        gitCommanderManager,
+        gitSourceSettings
+      );
+
+      await expect(() =>
+        gitAuthHelper.configureToken('configPath', true)
+      ).rejects.toThrow(
+        new Error('Unable to replace auth placeholder in configPath')
+      );
+
+      const assertOkSpy: jest.SpyInstance<any, any> = jest.spyOn(assert, 'ok');
+      expect(assertOkSpy).toHaveBeenCalledTimes(2);
+    });
+  });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

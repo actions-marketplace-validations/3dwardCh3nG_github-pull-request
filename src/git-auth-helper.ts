@@ -87,7 +87,7 @@ export class GitAuthHelper implements IGitAuthHelper {
     }
 
     // Write key
-    const runnerTemp: string = process.env['RUNNER_TEMP'] ?? '';
+    const runnerTemp: string | undefined = process.env['RUNNER_TEMP'];
     assert.ok(runnerTemp, 'RUNNER_TEMP is not defined');
     const uniqueId: string = uuidv4();
     this._sshKeyPath = path.join(runnerTemp, uniqueId);
@@ -180,10 +180,12 @@ export class GitAuthHelper implements IGitAuthHelper {
     );
 
     // Replace the placeholder
-    await this.replaceTokenPlaceholder(configPath ?? '');
+    await this.replaceTokenPlaceholder(configPath);
   }
 
-  private async replaceTokenPlaceholder(configPath: string): Promise<void> {
+  private async replaceTokenPlaceholder(
+    configPath: string | undefined
+  ): Promise<void> {
     assert.ok(configPath, 'configPath is not defined');
     let content: string = (await promises.readFile(configPath)).toString();
     const placeholderIndex: number = content.indexOf(

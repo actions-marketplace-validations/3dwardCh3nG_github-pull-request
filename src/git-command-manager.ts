@@ -402,7 +402,8 @@ export class GitCommandManager implements IGitCommandManager {
   private getEnvs(): { [key: string]: string } {
     const env: { [key: string]: string } = {};
     for (const key of Object.keys(process.env)) {
-      env[key] = process.env[key] ?? '';
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      env[key] = process.env[key]!;
     }
     for (const key of Object.keys(this._gitEnv)) {
       env[key] = this._gitEnv[key];
