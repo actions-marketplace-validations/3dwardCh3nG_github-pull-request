@@ -15053,7 +15053,7 @@ class Service {
     async prepareGitAuthentication() {
         const repoPath = this.workflowUtils.getRepoPath();
         const git = await git_command_manager_1.GitCommandManager.create(repoPath);
-        const gitSourceSettings = new git_source_settings_1.GitSourceSettings(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.SOURCE_BRANCH_NAME, this.inputs.TARGET_BRANCH_NAME, undefined, undefined, undefined, undefined, undefined);
+        const gitSourceSettings = new git_source_settings_1.GitSourceSettings(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.GITHUB_TOKEN, undefined, undefined, undefined, undefined, undefined, undefined);
         const gitAuthHelper = new git_auth_helper_1.GitAuthHelper(git, gitSourceSettings);
         const remoteUrl = await git.getRepoRemoteUrl();
         const remoteDetail = git.getRemoteDetail(remoteUrl);
