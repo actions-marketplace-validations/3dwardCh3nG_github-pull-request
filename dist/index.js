@@ -14996,7 +14996,7 @@ class Service {
         if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
             await git.fetchRemote([`${this.inputs.TARGET_BRANCH_NAME}:${this.inputs.TARGET_BRANCH_NAME}`], this.inputs.REMOTE_NAME, ['--force']);
             await git.checkout(this.inputs.TARGET_BRANCH_NAME);
-            await git.pull();
+            await git.pull([this.inputs.REMOTE_NAME, this.inputs.TARGET_BRANCH_NAME]);
         }
         const tempBranch = (0, uuid_1.v4)();
         await git.checkout(tempBranch, 'HEAD');

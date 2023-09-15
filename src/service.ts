@@ -157,7 +157,7 @@ export class Service implements IService {
         ['--force']
       );
       await git.checkout(this.inputs.TARGET_BRANCH_NAME);
-      await git.pull();
+      await git.pull([this.inputs.REMOTE_NAME, this.inputs.TARGET_BRANCH_NAME]);
     }
     const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
