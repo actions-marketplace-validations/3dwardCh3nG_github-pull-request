@@ -346,7 +346,7 @@ describe('Test service.ts', (): void => {
         hasDiffMock.mockReturnValue(false);
         commitsAheadMock.mockImplementation(
           (branch1: string, branch2: string) => {
-            if (branch1 === 'target-branch') {
+            if (branch1 === 'remote-name/target-branch') {
               if (
                 branch2 !== 'source-branch' &&
                 !branch2.includes('-merge-to-')
@@ -413,7 +413,7 @@ describe('Test service.ts', (): void => {
         hasDiffMock.mockReturnValue(false);
         commitsAheadMock.mockImplementation(
           (branch1: string, branch2: string) => {
-            if (branch1 === 'target-branch') {
+            if (branch1 === 'remote-name/target-branch') {
               if (
                 branch2 !== 'source-branch' &&
                 !branch2.includes('-merge-to-')
@@ -480,7 +480,7 @@ describe('Test service.ts', (): void => {
         hasDiffMock.mockReturnValue(false);
         commitsAheadMock.mockImplementation(
           (branch1: string, branch2: string) => {
-            if (branch1 === 'target-branch') {
+            if (branch1 === 'remote-name/target-branch') {
               if (
                 branch2 !== 'source-branch' &&
                 !branch2.includes('-merge-to-')

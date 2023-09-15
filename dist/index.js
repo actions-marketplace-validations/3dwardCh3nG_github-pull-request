@@ -15017,7 +15017,7 @@ class Service {
         if (!(await git.fetch(this.inputs.REMOTE_NAME, pullRequestBranchName))) {
             core.info(`Pull request branch '${pullRequestBranchName}' does not exist yet.`);
             await git.checkout(pullRequestBranchName, tempBranch);
-            result.hasDiffWithTargetBranch = await git.isAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName, ['--']);
+            result.hasDiffWithTargetBranch = await git.isAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, pullRequestBranchName, ['--']);
             if (result.hasDiffWithTargetBranch) {
                 result.action = 'created';
                 core.info(`Created branch '${pullRequestBranchName}'`);
@@ -15029,8 +15029,8 @@ class Service {
         else {
             core.info(`Pull request branch '${pullRequestBranchName}' already exists as remote branch '${this.inputs.REMOTE_NAME}/${pullRequestBranchName}'`);
             await git.checkout(pullRequestBranchName);
-            const tempBranchCommitsAhead = await git.commitsAhead(this.inputs.TARGET_BRANCH_NAME, tempBranch);
-            const branchCommitsAhead = await git.commitsAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName);
+            const tempBranchCommitsAhead = await git.commitsAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, tempBranch);
+            const branchCommitsAhead = await git.commitsAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, pullRequestBranchName);
             if ((await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
                 branchCommitsAhead !== tempBranchCommitsAhead ||
                 !(tempBranchCommitsAhead > 0)) {

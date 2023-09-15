@@ -173,7 +173,7 @@ export class Service implements IService {
       );
       await git.checkout(pullRequestBranchName, tempBranch);
       result.hasDiffWithTargetBranch = await git.isAhead(
-        this.inputs.TARGET_BRANCH_NAME,
+        `${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`,
         pullRequestBranchName,
         ['--']
       );
@@ -191,11 +191,11 @@ export class Service implements IService {
       );
       await git.checkout(pullRequestBranchName);
       const tempBranchCommitsAhead: number = await git.commitsAhead(
-        this.inputs.TARGET_BRANCH_NAME,
+        `${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`,
         tempBranch
       );
       const branchCommitsAhead: number = await git.commitsAhead(
-        this.inputs.TARGET_BRANCH_NAME,
+        `${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`,
         pullRequestBranchName
       );
       if (
