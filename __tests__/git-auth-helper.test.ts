@@ -255,7 +255,7 @@ describe('Test git-auth-helper.ts', (): void => {
         'utf8'
       ).toString('base64');
 
-      const runnerTemp: string = '/tmp';
+      const runnerTemp: string = '/usr/bin';
       process.env['RUNNER_TEMP'] = runnerTemp;
 
       const githubServerUrl: string = 'https://www.github.com.au';
@@ -287,7 +287,7 @@ describe('Test git-auth-helper.ts', (): void => {
       const sshKeyPath: string = gitAuthHelper.sshKeyPath;
       const slashIndex: number = sshKeyPath.lastIndexOf('/');
       const uuid4: string = sshKeyPath.substring(slashIndex + 1);
-      const sshKnownHostsPath: string = `/tmp/${uuid4}_known_hosts`;
+      const sshKnownHostsPath: string = `/usr/bin/${uuid4}_known_hosts`;
       const sshKeyPathBaseName: string = path.basename(
         gitAuthHelper.sshKeyPath
       );
@@ -391,7 +391,7 @@ describe('Test git-auth-helper.ts', (): void => {
       );
       getStateSpy.mockImplementation((key: string): string => {
         if (key === 'sshKnownHostsPath') {
-          return '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
+          return '/usr/bin/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
         }
         return '';
       });
@@ -434,7 +434,7 @@ describe('Test git-auth-helper.ts', (): void => {
       expect(rmRFMock).toHaveBeenCalledTimes(2);
       expect(rmRFMock).toHaveBeenCalledWith('/usr/bin/sshKeyPath');
       expect(rmRFMock).toHaveBeenCalledWith(
-        '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts'
+        '/usr/bin/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts'
       );
       expect(debugSpy).toHaveBeenCalledTimes(1);
       expect(debugSpy).toHaveBeenCalledWith('Test remove ssh key error');
@@ -477,7 +477,7 @@ describe('Test git-auth-helper.ts', (): void => {
       });
       getStateSpy.mockImplementation((key: string): string => {
         if (key === 'sshKnownHostsPath') {
-          return '/tmp/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
+          return '/usr/bin/30d7c7dd-da82-4242-91d4-33862a40d68d_known_hosts';
         }
         return '';
       });
