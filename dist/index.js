@@ -13934,6 +13934,7 @@ class GitCommandManager {
         else {
             args.push(ref);
         }
+        args.push('--');
         await this.execGit(args);
     }
     async fetch(remote, branch) {
@@ -15073,7 +15074,7 @@ class Service {
         }
         result.headSha = await git.revParse('HEAD');
         await git.deleteBranch(tempBranch, ['--force']);
-        await git.switch(workingBaseAndType.workingBase, ['--']);
+        await git.switch(workingBaseAndType.workingBase);
         if (stashed) {
             await git.stashPop();
         }

@@ -177,6 +177,7 @@ export class GitCommandManager implements IGitCommandManager {
     } else {
       args.push(ref);
     }
+    args.push('--');
     await this.execGit(args);
   }
 
