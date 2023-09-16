@@ -56,7 +56,7 @@ jobs:
       - name: Switch to Develop branch
         run: |
           git fetch --all
-          git checkout develop
+          git checkout ${{ steps.branch-name.outputs.current_branch }}
       - name: Test Local Action
         id: test-action-merge-develop-to-current-branch
         uses: ./
