@@ -13923,6 +13923,19 @@ class GitCommandManager {
         args.push('--');
         await this.execGit(args);
     }
+    async switch(ref, options, startPoint) {
+        const args = ['switch'];
+        if (options) {
+            args.push(...options);
+        }
+        if (startPoint) {
+            args.push('-c', ref, startPoint);
+        }
+        else {
+            args.push(ref);
+        }
+        await this.execGit(args);
+    }
     async fetch(remote, branch) {
         try {
             await this.fetchRemote([`${branch}:refs/remotes/${remote}/${branch}`], remote, ['--force']);
@@ -14088,6 +14101,7 @@ class GitCommandManager {
         };
         const exitCode = await exec.exec(this._gitPath, args, execOptions);
         output.exitCode = exitCode;
+        core.debug(output.getDebug());
         return output;
     }
     getEnvs() {
@@ -15052,7 +15066,7 @@ class Service {
         }
         result.headSha = await git.revParse('HEAD');
         await git.deleteBranch(tempBranch, ['--force']);
-        await git.checkout(workingBaseAndType.workingBase);
+        await git.switch(workingBaseAndType.workingBase);
         if (stashed) {
             await git.stashPop();
         }

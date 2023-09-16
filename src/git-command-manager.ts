@@ -34,6 +34,8 @@ export interface IGitCommandManager {
 
   checkout(ref: string, startPoint?: string): Promise<void>;
 
+  switch(ref: string, options?: string[], startPoint?: string): Promise<void>;
+
   fetch(remote: string, branch: string): Promise<boolean>;
 
   fetchRemote(
@@ -181,6 +183,23 @@ export class GitCommandManager implements IGitCommandManager {
     }
     // https://github.com/git/git/commit/a047fafc7866cc4087201e284dc1f53e8f9a32d5
     args.push('--');
+    await this.execGit(args);
+  }
+
+  async switch(
+    ref: string,
+    options?: string[],
+    startPoint?: string
+  ): Promise<void> {
+    const args: string[] = ['switch'];
+    if (options) {
+      args.push(...options);
+    }
+    if (startPoint) {
+      args.push('-c', ref, startPoint);
+    } else {
+      args.push(ref);
+    }
     await this.execGit(args);
   }
 
@@ -436,6 +455,8 @@ export class GitCommandManager implements IGitCommandManager {
 
     const exitCode: number = await exec.exec(this._gitPath, args, execOptions);
     output.exitCode = exitCode;
+
+    core.debug(output.getDebug());
 
     return output;
   }
