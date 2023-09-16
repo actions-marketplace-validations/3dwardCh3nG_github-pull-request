@@ -156,7 +156,7 @@ export class Service implements IService {
     if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
       await git.fetchAll();
       await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
-      await git.pull([this.inputs.REMOTE_NAME, this.inputs.SOURCE_BRANCH_NAME]);
+      await git.pull();
     }
     const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
