@@ -14148,6 +14148,10 @@ class GitCommandManager {
     removeEnvironmentVariable(name) {
         delete this._gitEnv[name];
     }
+    async showHEAD() {
+        const output = await this.execGit(['show', 'HEAD']);
+        return output.getStdout();
+    }
     get workflowUtils() {
         return this._workflowUtils;
     }
@@ -15024,8 +15028,10 @@ class Service {
             await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
             await git.pull();
         }
+        await git.showHEAD();
         const tempBranch = (0, uuid_1.v4)();
         await git.checkout(tempBranch, 'HEAD');
+        await git.showHEAD();
         let pullRequestBranchName = this.inputs.SOURCE_BRANCH_NAME;
         if (this.inputs.REQUIRE_MIDDLE_BRANCH) {
             pullRequestBranchName = `${this.inputs.SOURCE_BRANCH_NAME}-merge-to-${this.inputs.TARGET_BRANCH_NAME}`;

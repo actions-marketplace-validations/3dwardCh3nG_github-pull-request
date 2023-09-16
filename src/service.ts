@@ -158,8 +158,11 @@ export class Service implements IService {
       await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
       await git.pull();
     }
+
+    await git.showHEAD();
     const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
+    await git.showHEAD();
 
     let pullRequestBranchName: string = this.inputs.SOURCE_BRANCH_NAME;
     if (this.inputs.REQUIRE_MIDDLE_BRANCH) {

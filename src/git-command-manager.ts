@@ -21,71 +21,48 @@ export interface IWorkingBaseAndType {
 
 export interface IGitCommandManager {
   getRepoRemoteUrl(): Promise<string>;
-
   getRemoteDetail(remoteUrl: string): IRemoteDetail;
-
   getWorkingBaseAndType(): Promise<IWorkingBaseAndType>;
-
   stashPush(options?: string[]): Promise<boolean>;
-
   stashPop(options?: string[]): Promise<void>;
-
   revParse(ref: string, options?: string[]): Promise<string>;
-
   checkout(ref: string, startPoint?: string): Promise<void>;
-
   switch(ref: string, options?: string[], startPoint?: string): Promise<void>;
-
   fetch(remote: string, branch: string): Promise<boolean>;
-
   fetchRemote(
     refSpec: string[],
     remoteName?: string,
     options?: string[]
   ): Promise<void>;
-
   fetchAll(): Promise<void>;
-
   isAhead(
     branch1: string,
     branch2: string,
     options?: string[]
   ): Promise<boolean>;
-
   commitsAhead(
     branch1: string,
     branch2: string,
     options?: string[]
   ): Promise<number>;
-
   isEven(branch1: string, branch2: string): Promise<boolean>;
-
   pull(options?: string[]): Promise<void>;
-
   push(options?: string[]): Promise<void>;
-
   deleteBranch(branchName: string, options?: string[]): Promise<void>;
-
   status(options?: string[]): Promise<string>;
-
   hasDiff(options?: string[]): Promise<boolean>;
-
   config(
     configKey: string,
     configValue: string,
     globalConfig?: boolean,
     add?: boolean
   ): Promise<void>;
-
   configExists(configKey: string, globalConfig?: boolean): Promise<boolean>;
-
   unsetConfig(configKey: string, globalConfig?: boolean): Promise<boolean>;
-
   getGitDirectory(): Promise<string>;
-
   setEnvironmentVariable(name: string, value: string): void;
-
   removeEnvironmentVariable(name: string): void;
+  showHEAD(): Promise<string>;
   get workflowUtils(): IWorkflowUtils;
   get gitPath(): string;
   get workingDirectory(): string;
@@ -519,6 +496,11 @@ export class GitCommandManager implements IGitCommandManager {
 
   removeEnvironmentVariable(name: string): void {
     delete this._gitEnv[name];
+  }
+
+  async showHEAD(): Promise<string> {
+    const output: GitExecOutput = await this.execGit(['show', 'HEAD']);
+    return output.getStdout();
   }
 
   get workflowUtils(): IWorkflowUtils {
