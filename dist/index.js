@@ -15023,6 +15023,7 @@ class Service {
         const workingBaseAndType = await git.getWorkingBaseAndType();
         core.info(`Working base is ${workingBaseAndType.workingBaseType} '${workingBaseAndType.workingBase}'`);
         const stashed = await git.stashPush(['--include-untracked']);
+        await git.showHEAD();
         if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
             await git.fetchAll();
             await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
