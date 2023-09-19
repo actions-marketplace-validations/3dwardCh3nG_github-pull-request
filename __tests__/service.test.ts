@@ -267,8 +267,7 @@ describe('Test service.ts', (): void => {
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(3);
-        expect(switchMock).toHaveBeenCalledTimes(1);
+        expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);
@@ -313,8 +312,7 @@ describe('Test service.ts', (): void => {
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(3);
-        expect(switchMock).toHaveBeenCalledTimes(1);
+        expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);
@@ -375,8 +373,7 @@ describe('Test service.ts', (): void => {
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(4);
-        expect(switchMock).toHaveBeenCalledTimes(1);
+        expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);
@@ -443,8 +440,7 @@ describe('Test service.ts', (): void => {
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(4);
-        expect(switchMock).toHaveBeenCalledTimes(1);
+        expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);
@@ -503,8 +499,7 @@ describe('Test service.ts', (): void => {
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(3);
-        expect(switchMock).toHaveBeenCalledTimes(1);
+        expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);

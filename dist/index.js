@@ -15072,7 +15072,7 @@ class Service {
         }
         result.headSha = await git.revParse('HEAD');
         await git.deleteBranch(tempBranch, ['--force']);
-        await git.switch(workingBaseAndType.workingBase);
+        await git.checkout(workingBaseAndType.workingBase);
         if (stashed) {
             await git.stashPop();
         }
