@@ -14549,7 +14549,7 @@ const run = async () => {
         core.startGroup('Starting to create pull request');
         let pullRequest = await service.createPullRequest();
         core.endGroup();
-        if (inputs.AUTO_MERGE) {
+        if (pullRequest.number !== 0 && inputs.AUTO_MERGE) {
             core.startGroup('Starting to merge pull request');
             pullRequest = await service.mergePullRequestWithRetries(pullRequest);
             core.endGroup();
