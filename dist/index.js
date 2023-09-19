@@ -13870,21 +13870,30 @@ class GitCommandManager {
         return this.githubHttpsUrlValidator(githubUrl, remoteUrl);
     }
     async getWorkingBaseAndType() {
-        const symbolicRefResult = await this.execGit(['symbolic-ref', 'HEAD', '--short'], true);
-        if (symbolicRefResult.exitCode === 0) {
-            // ref
+        const ref = process.env['GITHUB_REF'];
+        if (ref?.includes('/pull/')) {
             return {
-                workingBase: symbolicRefResult.getStdout(),
-                workingBaseType: 'branch'
+                workingBase: ref,
+                workingBaseType: 'pull'
             };
         }
         else {
-            // detached HEAD
-            const headSha = await this.revParse('HEAD');
-            return {
-                workingBase: headSha,
-                workingBaseType: 'commit'
-            };
+            const symbolicRefResult = await this.execGit(['symbolic-ref', 'HEAD', '--short'], true);
+            if (symbolicRefResult.exitCode === 0) {
+                // ref
+                return {
+                    workingBase: symbolicRefResult.getStdout(),
+                    workingBaseType: 'branch'
+                };
+            }
+            else {
+                // detached HEAD
+                const headSha = await this.revParse('HEAD');
+                return {
+                    workingBase: headSha,
+                    workingBaseType: 'commit'
+                };
+            }
         }
     }
     async stashPush(options) {
@@ -14148,10 +14157,6 @@ class GitCommandManager {
     }
     removeEnvironmentVariable(name) {
         delete this._gitEnv[name];
-    }
-    async showHEAD() {
-        const output = await this.execGit(['show', 'HEAD']);
-        return output.getStdout();
     }
     get workflowUtils() {
         return this._workflowUtils;
@@ -14970,10 +14975,6 @@ class Service {
                 core.endGroup();
             }
         }
-        catch (error) {
-            core.setFailed(this.workflowUtils.getErrorMessage(error));
-            process.exit(1);
-        }
         finally {
             await gitAuthHelper.removeAuth();
         }
@@ -15024,16 +15025,13 @@ class Service {
         const workingBaseAndType = await git.getWorkingBaseAndType();
         core.info(`Working base is ${workingBaseAndType.workingBaseType} '${workingBaseAndType.workingBase}'`);
         const stashed = await git.stashPush(['--include-untracked']);
-        await git.showHEAD();
         if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
             await git.fetchAll();
             await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
             await git.pull();
         }
-        await git.showHEAD();
         const tempBranch = (0, uuid_1.v4)();
         await git.checkout(tempBranch, 'HEAD');
-        await git.showHEAD();
         let pullRequestBranchName = this.inputs.SOURCE_BRANCH_NAME;
         if (this.inputs.REQUIRE_MIDDLE_BRANCH) {
             pullRequestBranchName = `${this.inputs.SOURCE_BRANCH_NAME}-merge-to-${this.inputs.TARGET_BRANCH_NAME}`;
@@ -15058,7 +15056,7 @@ class Service {
             const branchCommitsAhead = await git.commitsAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, pullRequestBranchName);
             if ((await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
                 branchCommitsAhead !== tempBranchCommitsAhead ||
-                !(tempBranchCommitsAhead > 0)) {
+                tempBranchCommitsAhead <= 0) {
                 core.info(`Resetting '${pullRequestBranchName}'`);
                 await git.checkout(pullRequestBranchName, tempBranch);
             }

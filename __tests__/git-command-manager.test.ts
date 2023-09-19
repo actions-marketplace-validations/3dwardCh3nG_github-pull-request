@@ -221,6 +221,25 @@ describe('Test git-command-manager.ts', (): void => {
       );
     });
 
+    afterEach((): void => {
+      delete process.env['GITHUB_REF'];
+    });
+
+    it('should success and return working base and type when currently on Pull', async (): Promise<void> => {
+      process.env['GITHUB_REF'] = 'refs/pull/1/merge';
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      const workingBaseAndType: IWorkingBaseAndType =
+        await gitCommandManager.getWorkingBaseAndType();
+
+      expect(workingBaseAndType.workingBase).toBe('refs/pull/1/merge');
+      expect(workingBaseAndType.workingBaseType).toBe('pull');
+    });
+
     it('should success and return working base and type when currently on a branch HEAD', async (): Promise<void> => {
       const execMock: jest.SpyInstance = execSpy.mockImplementation(
         async (

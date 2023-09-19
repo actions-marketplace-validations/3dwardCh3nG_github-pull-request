@@ -171,12 +171,6 @@ jest.mock('../src/retry-helper-wrapper', () => {
 });
 
 describe('Test service.ts', (): void => {
-  beforeAll((): void => {
-    jest.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit() was called.');
-    });
-  });
-
   describe('Test createService function', (): void => {
     it('should return a new Service object', (): void => {
       setRequiredProcessEnvValues();
@@ -476,80 +470,50 @@ describe('Test service.ts', (): void => {
         expect(result).toEqual(pull);
       });
 
-      it('should fail the action execution when calling createPullRequest function when there is an error thrown from the inner logic', async (): Promise<void> => {
-        let tempBranchName: string = '';
+      it('should throw error when calling createPullRequest function when there is an error from the inner logic', async (): Promise<void> => {
         getWorkingBaseAndTypeMock.mockReturnValue({
-          workingBase: 'sha',
-          workingBaseType: 'commit'
+          workingBase: 'develop',
+          workingBaseType: 'branch'
         });
-        fetchMock.mockReturnValue(true);
-        hasDiffMock.mockReturnValue(false);
-        commitsAheadMock.mockImplementation(
-          (branch1: string, branch2: string) => {
-            if (branch1 === 'remote-name/target-branch') {
-              if (
-                branch2 !== 'source-branch' &&
-                !branch2.includes('-merge-to-')
-              ) {
-                tempBranchName = branch2;
-              }
-              return 0;
-            }
-            return 0;
-          }
-        );
-        isEvenMock.mockReturnValue(true);
+        fetchMock.mockReturnValue(false);
         isAheadMock.mockReturnValue(true);
+        const preparePullRequestError: Error = new Error(
+          'Error when calling githubClient.preparePullRequest'
+        );
         preparePullRequestMock.mockImplementation(() => {
-          throw Error('Error when calling githubClient.preparePullRequest');
+          throw preparePullRequestError;
         });
 
         setRequiredProcessEnvValues();
         setOptionalProcessEnvValues();
+        delete process.env['INPUT_REQUIRE_MIDDLE_BRANCH'];
         const inputs: IInputs = prepareInputValues();
         const service: IService = ServiceModule.createService(inputs);
 
         await expect(service.createPullRequest()).rejects.toThrow(
-          new Error('process.exit() was called.')
+          preparePullRequestError
         );
 
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(6);
-        expect(startGroupMock).toHaveBeenCalledTimes(3);
-        expect(endGroupMock).toHaveBeenCalledTimes(2);
+        expect(infoMock).toHaveBeenCalledTimes(5);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(3);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(4);
+        expect(checkoutMock).toHaveBeenCalledTimes(3);
         expect(switchMock).toHaveBeenCalledTimes(1);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);
         expect(revParseMock).toHaveBeenCalledTimes(1);
         expect(deleteBranchMock).toHaveBeenCalledTimes(1);
-        expect(deleteBranchMock).toHaveBeenCalledWith(tempBranchName, [
-          '--force'
-        ]);
-        expect(pushMock).toHaveBeenCalledTimes(0);
+        expect(pushMock).toHaveBeenCalledTimes(1);
         expect(stashPopMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
-        expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
-          action: 'not-updated',
-          sourceBranch: 'source-branch-merge-to-target-branch',
-          targetBranch: 'target-branch',
-          hasDiffWithTargetBranch: true,
-          headSha: 'sha'
-        } as ICreateOrUpdatePullRequestBranchResult);
         expect(removeAuthMock).toHaveBeenCalledTimes(1);
-        expect(commitsAheadMock).toHaveBeenCalledTimes(2);
-        expect(hasDiffMock).toHaveBeenCalledTimes(1);
-        expect(isEvenMock).toHaveBeenCalledTimes(1);
-        expect(setFailedMock).toHaveBeenCalledTimes(1);
-        expect(setFailedMock).toHaveBeenCalledWith(
-          'Error when calling githubClient.preparePullRequest'
-        );
       });
     });
 

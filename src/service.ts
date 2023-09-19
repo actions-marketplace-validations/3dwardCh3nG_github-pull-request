@@ -81,9 +81,6 @@ export class Service implements IService {
         );
         core.endGroup();
       }
-    } catch (error) {
-      core.setFailed(this.workflowUtils.getErrorMessage(error));
-      process.exit(1);
     } finally {
       await gitAuthHelper.removeAuth();
     }
@@ -153,18 +150,14 @@ export class Service implements IService {
 
     const stashed: boolean = await git.stashPush(['--include-untracked']);
 
-    await git.showHEAD();
-
     if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
       await git.fetchAll();
       await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
       await git.pull();
     }
 
-    await git.showHEAD();
     const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
-    await git.showHEAD();
 
     let pullRequestBranchName: string = this.inputs.SOURCE_BRANCH_NAME;
     if (this.inputs.REQUIRE_MIDDLE_BRANCH) {
@@ -206,7 +199,7 @@ export class Service implements IService {
       if (
         (await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
         branchCommitsAhead !== tempBranchCommitsAhead ||
-        !(tempBranchCommitsAhead > 0)
+        tempBranchCommitsAhead <= 0
       ) {
         core.info(`Resetting '${pullRequestBranchName}'`);
         await git.checkout(pullRequestBranchName, tempBranch);

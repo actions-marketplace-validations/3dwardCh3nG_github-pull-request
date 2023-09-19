@@ -16,7 +16,7 @@ export interface IRemoteDetail {
 
 export interface IWorkingBaseAndType {
   workingBase: string;
-  workingBaseType: 'commit' | 'branch';
+  workingBaseType: 'commit' | 'branch' | 'pull';
 }
 
 export interface IGitCommandManager {
@@ -62,7 +62,6 @@ export interface IGitCommandManager {
   getGitDirectory(): Promise<string>;
   setEnvironmentVariable(name: string, value: string): void;
   removeEnvironmentVariable(name: string): void;
-  showHEAD(): Promise<string>;
   get workflowUtils(): IWorkflowUtils;
   get gitPath(): string;
   get workingDirectory(): string;
@@ -104,23 +103,31 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   async getWorkingBaseAndType(): Promise<IWorkingBaseAndType> {
-    const symbolicRefResult: GitExecOutput = await this.execGit(
-      ['symbolic-ref', 'HEAD', '--short'],
-      true
-    );
-    if (symbolicRefResult.exitCode === 0) {
-      // ref
+    const ref: string | undefined = process.env['GITHUB_REF'];
+    if (ref?.includes('/pull/')) {
       return {
-        workingBase: symbolicRefResult.getStdout(),
-        workingBaseType: 'branch'
+        workingBase: ref,
+        workingBaseType: 'pull'
       } as IWorkingBaseAndType;
     } else {
-      // detached HEAD
-      const headSha: string = await this.revParse('HEAD');
-      return {
-        workingBase: headSha,
-        workingBaseType: 'commit'
-      } as IWorkingBaseAndType;
+      const symbolicRefResult: GitExecOutput = await this.execGit(
+        ['symbolic-ref', 'HEAD', '--short'],
+        true
+      );
+      if (symbolicRefResult.exitCode === 0) {
+        // ref
+        return {
+          workingBase: symbolicRefResult.getStdout(),
+          workingBaseType: 'branch'
+        } as IWorkingBaseAndType;
+      } else {
+        // detached HEAD
+        const headSha: string = await this.revParse('HEAD');
+        return {
+          workingBase: headSha,
+          workingBaseType: 'commit'
+        } as IWorkingBaseAndType;
+      }
     }
   }
 
@@ -497,11 +504,6 @@ export class GitCommandManager implements IGitCommandManager {
 
   removeEnvironmentVariable(name: string): void {
     delete this._gitEnv[name];
-  }
-
-  async showHEAD(): Promise<string> {
-    const output: GitExecOutput = await this.execGit(['show', 'HEAD']);
-    return output.getStdout();
   }
 
   get workflowUtils(): IWorkflowUtils {
