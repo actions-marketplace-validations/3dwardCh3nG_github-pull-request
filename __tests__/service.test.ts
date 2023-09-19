@@ -307,8 +307,8 @@ describe('Test service.ts', (): void => {
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(2);
-        expect(endGroupMock).toHaveBeenCalledTimes(2);
+        expect(startGroupMock).toHaveBeenCalledTimes(1);
+        expect(endGroupMock).toHaveBeenCalledTimes(1);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
         expect(fetchAllMock).toHaveBeenCalledTimes(1);
