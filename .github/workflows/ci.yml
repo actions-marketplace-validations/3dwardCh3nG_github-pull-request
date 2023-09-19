@@ -50,13 +50,11 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Get branch name
         id: branch-name
         uses: tj-actions/branch-names@v7.0.5
-      - name: Switch to Develop branch
-        run: |
-          git fetch --all
-          git checkout ${{ steps.branch-name.outputs.current_branch }}
       - name: Test Local Action
         id: test-action-merge-develop-to-current-branch
         uses: ./
