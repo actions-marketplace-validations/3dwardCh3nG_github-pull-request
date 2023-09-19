@@ -58,7 +58,7 @@ jobs:
         pr_title: 'Merge PR from Master to Develop'
         require_middle_branch: true
         auto_merge: true
-        max_merge_retries: 10
+        max_merge_retries: 60
         merge_retry_interval: 60
 ```
 
