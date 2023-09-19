@@ -69,11 +69,11 @@ export class Service implements IService {
         await this.preparePullRequestBranch(git);
       core.endGroup();
 
-      core.startGroup('Pushing the pull request branch');
-      await this.pushPullRequestBranch(git, result);
-      core.endGroup();
-
       if (result.hasDiffWithTargetBranch) {
+        core.startGroup('Pushing the pull request branch');
+        await this.pushPullRequestBranch(git, result);
+        core.endGroup();
+
         core.startGroup('Create or update the pull request');
         pullRequest = await this.githubClient.preparePullRequest(
           this.inputs,
