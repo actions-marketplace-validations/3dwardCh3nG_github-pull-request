@@ -46,6 +46,10 @@ jobs:
   test-action:
     name: GitHub Actions Test
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'develop' &&
+      github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened'
     steps:
       - name: Checkout
         id: checkout
@@ -71,7 +75,7 @@ jobs:
   release:
     name: generate-version
     runs-on: ubuntu-latest
-    needs: [ test-typescript, test-action ]
+    needs: [ test-typescript ]
     permissions:
       contents: write
       issues: write
