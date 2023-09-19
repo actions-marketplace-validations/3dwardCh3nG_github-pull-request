@@ -67,7 +67,6 @@ const getRepoRemoteUrlMock: jest.Mock<any, any, any> = jest.fn();
 const getRemoteDetailMock: jest.Mock<any, any, any> = jest.fn();
 const getWorkingBaseAndTypeMock: jest.Mock<any, any, any> = jest.fn();
 const stashPushMock: jest.Mock<any, any, any> = jest.fn();
-const fetchRemoteMock: jest.Mock<any, any, any> = jest.fn();
 const checkoutMock: jest.Mock<any, any, any> = jest.fn();
 const pullMock: jest.Mock<any, any, any> = jest.fn();
 const fetchMock: jest.Mock<any, any, any> = jest.fn();
@@ -79,6 +78,8 @@ const stashPopMock: jest.Mock<any, any, any> = jest.fn();
 const commitsAheadMock: jest.Mock<any, any, any> = jest.fn();
 const hasDiffMock: jest.Mock<any, any, any> = jest.fn();
 const isEvenMock: jest.Mock<any, any, any> = jest.fn();
+const fetchAllMock: jest.Mock<any, any, any> = jest.fn();
+const switchMock: jest.Mock<any, any, any> = jest.fn();
 jest.mock('../src/git-command-manager', () => {
   return {
     ...jest.requireActual('../src/git-command-manager'),
@@ -89,7 +90,6 @@ jest.mock('../src/git-command-manager', () => {
         getRemoteDetail: getRemoteDetailMock,
         getWorkingBaseAndType: getWorkingBaseAndTypeMock,
         stashPush: stashPushMock,
-        fetchRemote: fetchRemoteMock,
         checkout: checkoutMock,
         pull: pullMock,
         fetch: fetchMock,
@@ -100,7 +100,9 @@ jest.mock('../src/git-command-manager', () => {
         stashPop: stashPopMock,
         commitsAhead: commitsAheadMock,
         hasDiff: hasDiffMock,
-        isEven: isEvenMock
+        isEven: isEvenMock,
+        fetchAll: fetchAllMock,
+        switch: switchMock
       };
     })
   };
@@ -259,12 +261,12 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(4);
-        expect(startGroupMock).toHaveBeenCalledTimes(3);
-        expect(endGroupMock).toHaveBeenCalledTimes(3);
+        expect(infoMock).toHaveBeenCalledTimes(5);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -304,12 +306,12 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(4);
-        expect(startGroupMock).toHaveBeenCalledTimes(1);
-        expect(endGroupMock).toHaveBeenCalledTimes(1);
+        expect(infoMock).toHaveBeenCalledTimes(5);
+        expect(startGroupMock).toHaveBeenCalledTimes(2);
+        expect(endGroupMock).toHaveBeenCalledTimes(2);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -340,7 +342,7 @@ describe('Test service.ts', (): void => {
         hasDiffMock.mockReturnValue(false);
         commitsAheadMock.mockImplementation(
           (branch1: string, branch2: string) => {
-            if (branch1 === 'target-branch') {
+            if (branch1 === 'remote-name/target-branch') {
               if (
                 branch2 !== 'source-branch' &&
                 !branch2.includes('-merge-to-')
@@ -365,12 +367,12 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(3);
-        expect(endGroupMock).toHaveBeenCalledTimes(3);
+        expect(infoMock).toHaveBeenCalledTimes(6);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(4);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -385,8 +387,8 @@ describe('Test service.ts', (): void => {
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
           action: 'updated',
-          sourceBranch: 'source-branch',
-          targetBranch: 'source-branch-merge-to-target-branch',
+          sourceBranch: 'source-branch-merge-to-target-branch',
+          targetBranch: 'target-branch',
           hasDiffWithTargetBranch: true,
           headSha: 'sha'
         } as ICreateOrUpdatePullRequestBranchResult);
@@ -407,7 +409,7 @@ describe('Test service.ts', (): void => {
         hasDiffMock.mockReturnValue(false);
         commitsAheadMock.mockImplementation(
           (branch1: string, branch2: string) => {
-            if (branch1 === 'target-branch') {
+            if (branch1 === 'remote-name/target-branch') {
               if (
                 branch2 !== 'source-branch' &&
                 !branch2.includes('-merge-to-')
@@ -432,12 +434,12 @@ describe('Test service.ts', (): void => {
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
-        expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(2);
-        expect(endGroupMock).toHaveBeenCalledTimes(2);
+        expect(infoMock).toHaveBeenCalledTimes(6);
+        expect(startGroupMock).toHaveBeenCalledTimes(3);
+        expect(endGroupMock).toHaveBeenCalledTimes(3);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
         expect(checkoutMock).toHaveBeenCalledTimes(5);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -452,8 +454,8 @@ describe('Test service.ts', (): void => {
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
           action: 'not-updated',
-          sourceBranch: 'source-branch',
-          targetBranch: 'source-branch-merge-to-target-branch',
+          sourceBranch: 'source-branch-merge-to-target-branch',
+          targetBranch: 'target-branch',
           hasDiffWithTargetBranch: true,
           headSha: 'sha'
         } as ICreateOrUpdatePullRequestBranchResult);
@@ -464,85 +466,49 @@ describe('Test service.ts', (): void => {
         expect(result).toEqual(pull);
       });
 
-      it('should fail the action execution when calling createPullRequest function when there is an error thrown from the inner logic', async (): Promise<void> => {
-        let tempBranchName: string = '';
+      it('should throw error when calling createPullRequest function when there is an error from the inner logic', async (): Promise<void> => {
         getWorkingBaseAndTypeMock.mockReturnValue({
-          workingBase: 'sha',
-          workingBaseType: 'commit'
+          workingBase: 'develop',
+          workingBaseType: 'branch'
         });
-        fetchMock.mockReturnValue(true);
-        hasDiffMock.mockReturnValue(false);
-        commitsAheadMock.mockImplementation(
-          (branch1: string, branch2: string) => {
-            if (branch1 === 'target-branch') {
-              if (
-                branch2 !== 'source-branch' &&
-                !branch2.includes('-merge-to-')
-              ) {
-                tempBranchName = branch2;
-              }
-              return 0;
-            }
-            return 0;
-          }
-        );
-        isEvenMock.mockReturnValue(true);
+        fetchMock.mockReturnValue(false);
         isAheadMock.mockReturnValue(true);
+        const preparePullRequestError: Error = new Error(
+          'Error when calling githubClient.preparePullRequest'
+        );
         preparePullRequestMock.mockImplementation(() => {
-          throw Error('Error when calling githubClient.preparePullRequest');
+          throw preparePullRequestError;
         });
 
         setRequiredProcessEnvValues();
         setOptionalProcessEnvValues();
+        delete process.env['INPUT_REQUIRE_MIDDLE_BRANCH'];
         const inputs: IInputs = prepareInputValues();
         const service: IService = ServiceModule.createService(inputs);
 
-        const result: Pull = await service.createPullRequest();
+        await expect(service.createPullRequest()).rejects.toThrow(
+          preparePullRequestError
+        );
 
         expect(getRepoPathMock).toHaveBeenCalledTimes(1);
         expect(gitCommandManagerCreateFunctionMock).toHaveBeenCalledTimes(1);
         expect(GitSourceSettings).toHaveBeenCalledTimes(1);
         expect(infoMock).toHaveBeenCalledTimes(5);
-        expect(startGroupMock).toHaveBeenCalledTimes(2);
-        expect(endGroupMock).toHaveBeenCalledTimes(1);
+        expect(startGroupMock).toHaveBeenCalledTimes(4);
+        expect(endGroupMock).toHaveBeenCalledTimes(3);
         expect(getWorkingBaseAndTypeMock).toHaveBeenCalledTimes(1);
         expect(stashPushMock).toHaveBeenCalledTimes(1);
-        expect(fetchRemoteMock).toHaveBeenCalledTimes(1);
-        expect(checkoutMock).toHaveBeenCalledTimes(5);
+        expect(fetchAllMock).toHaveBeenCalledTimes(1);
+        expect(checkoutMock).toHaveBeenCalledTimes(4);
         expect(pullMock).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isAheadMock).toHaveBeenCalledTimes(1);
         expect(revParseMock).toHaveBeenCalledTimes(1);
         expect(deleteBranchMock).toHaveBeenCalledTimes(1);
-        expect(deleteBranchMock).toHaveBeenCalledWith(tempBranchName, [
-          '--force'
-        ]);
-        expect(pushMock).toHaveBeenCalledTimes(0);
+        expect(pushMock).toHaveBeenCalledTimes(1);
         expect(stashPopMock).toHaveBeenCalledTimes(1);
         expect(preparePullRequestMock).toHaveBeenCalledTimes(1);
-        expect(preparePullRequestMock).toHaveBeenCalledWith(inputs, {
-          action: 'not-updated',
-          sourceBranch: 'source-branch',
-          targetBranch: 'source-branch-merge-to-target-branch',
-          hasDiffWithTargetBranch: true,
-          headSha: 'sha'
-        } as ICreateOrUpdatePullRequestBranchResult);
         expect(removeAuthMock).toHaveBeenCalledTimes(1);
-        expect(commitsAheadMock).toHaveBeenCalledTimes(2);
-        expect(hasDiffMock).toHaveBeenCalledTimes(1);
-        expect(isEvenMock).toHaveBeenCalledTimes(1);
-        expect(setFailedMock).toHaveBeenCalledTimes(1);
-        expect(setFailedMock).toHaveBeenCalledWith(
-          'Error when calling githubClient.preparePullRequest'
-        );
-        expect(result).toEqual({
-          number: 0,
-          sha: '',
-          html_url: '',
-          action: '',
-          created: false,
-          merged: false
-        } as Pull);
       });
     });
 

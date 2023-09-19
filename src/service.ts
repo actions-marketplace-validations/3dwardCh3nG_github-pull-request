@@ -69,7 +69,9 @@ export class Service implements IService {
         await this.preparePullRequestBranch(git);
       core.endGroup();
 
+      core.startGroup('Pushing the pull request branch');
       await this.pushPullRequestBranch(git, result);
+      core.endGroup();
 
       if (result.hasDiffWithTargetBranch) {
         core.startGroup('Create or update the pull request');
@@ -79,8 +81,6 @@ export class Service implements IService {
         );
         core.endGroup();
       }
-    } catch (error) {
-      core.setFailed(this.workflowUtils.getErrorMessage(error));
     } finally {
       await gitAuthHelper.removeAuth();
     }
@@ -144,25 +144,25 @@ export class Service implements IService {
 
     const workingBaseAndType: IWorkingBaseAndType =
       await git.getWorkingBaseAndType();
+    core.info(
+      `Working base is ${workingBaseAndType.workingBaseType} '${workingBaseAndType.workingBase}'`
+    );
 
     const stashed: boolean = await git.stashPush(['--include-untracked']);
 
-    if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
-      await git.fetchRemote(
-        [`${this.inputs.TARGET_BRANCH_NAME}:${this.inputs.TARGET_BRANCH_NAME}`],
-        this.inputs.REMOTE_NAME,
-        ['--force']
-      );
-      await git.checkout(this.inputs.TARGET_BRANCH_NAME);
+    if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
+      await git.fetchAll();
+      await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
       await git.pull();
     }
+
     const tempBranch: string = uuidv4();
     await git.checkout(tempBranch, 'HEAD');
 
     let pullRequestBranchName: string = this.inputs.SOURCE_BRANCH_NAME;
     if (this.inputs.REQUIRE_MIDDLE_BRANCH) {
       pullRequestBranchName = `${this.inputs.SOURCE_BRANCH_NAME}-merge-to-${this.inputs.TARGET_BRANCH_NAME}`;
-      result.targetBranch = pullRequestBranchName;
+      result.sourceBranch = pullRequestBranchName;
     }
 
     if (!(await git.fetch(this.inputs.REMOTE_NAME, pullRequestBranchName))) {
@@ -171,8 +171,9 @@ export class Service implements IService {
       );
       await git.checkout(pullRequestBranchName, tempBranch);
       result.hasDiffWithTargetBranch = await git.isAhead(
-        this.inputs.TARGET_BRANCH_NAME,
-        pullRequestBranchName
+        `${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`,
+        pullRequestBranchName,
+        ['--']
       );
       if (result.hasDiffWithTargetBranch) {
         result.action = 'created';
@@ -188,17 +189,17 @@ export class Service implements IService {
       );
       await git.checkout(pullRequestBranchName);
       const tempBranchCommitsAhead: number = await git.commitsAhead(
-        this.inputs.TARGET_BRANCH_NAME,
+        `${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`,
         tempBranch
       );
       const branchCommitsAhead: number = await git.commitsAhead(
-        this.inputs.TARGET_BRANCH_NAME,
+        `${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`,
         pullRequestBranchName
       );
       if (
         (await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
         branchCommitsAhead !== tempBranchCommitsAhead ||
-        !(tempBranchCommitsAhead > 0)
+        tempBranchCommitsAhead <= 0
       ) {
         core.info(`Resetting '${pullRequestBranchName}'`);
         await git.checkout(pullRequestBranchName, tempBranch);
@@ -258,8 +259,8 @@ export class Service implements IService {
       repoPath,
       this.inputs.REPO_OWNER,
       this.inputs.REPO_NAME,
-      this.inputs.SOURCE_BRANCH_NAME,
-      this.inputs.TARGET_BRANCH_NAME,
+      this.inputs.GITHUB_TOKEN,
+      undefined,
       undefined,
       undefined,
       undefined,

@@ -16,63 +16,51 @@ export interface IRemoteDetail {
 
 export interface IWorkingBaseAndType {
   workingBase: string;
-  workingBaseType: 'commit' | 'branch';
+  workingBaseType: 'commit' | 'branch' | 'pull';
 }
 
 export interface IGitCommandManager {
   getRepoRemoteUrl(): Promise<string>;
-
   getRemoteDetail(remoteUrl: string): IRemoteDetail;
-
   getWorkingBaseAndType(): Promise<IWorkingBaseAndType>;
-
   stashPush(options?: string[]): Promise<boolean>;
-
   stashPop(options?: string[]): Promise<void>;
-
   revParse(ref: string, options?: string[]): Promise<string>;
-
   checkout(ref: string, startPoint?: string): Promise<void>;
-
+  switch(ref: string, options?: string[], startPoint?: string): Promise<void>;
   fetch(remote: string, branch: string): Promise<boolean>;
-
   fetchRemote(
     refSpec: string[],
     remoteName?: string,
     options?: string[]
   ): Promise<void>;
-
-  isAhead(branch1: string, branch2: string): Promise<boolean>;
-
-  commitsAhead(branch1: string, branch2: string): Promise<number>;
-
+  fetchAll(): Promise<void>;
+  isAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<boolean>;
+  commitsAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<number>;
   isEven(branch1: string, branch2: string): Promise<boolean>;
-
   pull(options?: string[]): Promise<void>;
-
   push(options?: string[]): Promise<void>;
-
   deleteBranch(branchName: string, options?: string[]): Promise<void>;
-
   status(options?: string[]): Promise<string>;
-
   hasDiff(options?: string[]): Promise<boolean>;
-
   config(
     configKey: string,
     configValue: string,
     globalConfig?: boolean,
     add?: boolean
   ): Promise<void>;
-
   configExists(configKey: string, globalConfig?: boolean): Promise<boolean>;
-
   unsetConfig(configKey: string, globalConfig?: boolean): Promise<boolean>;
-
   getGitDirectory(): Promise<string>;
-
   setEnvironmentVariable(name: string, value: string): void;
-
   removeEnvironmentVariable(name: string): void;
   get workflowUtils(): IWorkflowUtils;
   get gitPath(): string;
@@ -115,23 +103,33 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   async getWorkingBaseAndType(): Promise<IWorkingBaseAndType> {
-    const symbolicRefResult: GitExecOutput = await this.execGit(
-      ['symbolic-ref', 'HEAD', '--short'],
-      true
-    );
-    if (symbolicRefResult.exitCode === 0) {
-      // ref
+    let ref: string | undefined = process.env['GITHUB_REF'];
+    if (ref?.includes('/pull/')) {
+      const pullName: string = ref.substring('refs/pull/'.length);
+      ref = `refs/remotes/pull/${pullName}`;
       return {
-        workingBase: symbolicRefResult.getStdout(),
-        workingBaseType: 'branch'
+        workingBase: ref,
+        workingBaseType: 'pull'
       } as IWorkingBaseAndType;
     } else {
-      // detached HEAD
-      const headSha: string = await this.revParse('HEAD');
-      return {
-        workingBase: headSha,
-        workingBaseType: 'commit'
-      } as IWorkingBaseAndType;
+      const symbolicRefResult: GitExecOutput = await this.execGit(
+        ['symbolic-ref', 'HEAD', '--short'],
+        true
+      );
+      if (symbolicRefResult.exitCode === 0) {
+        // ref
+        return {
+          workingBase: symbolicRefResult.getStdout(),
+          workingBaseType: 'branch'
+        } as IWorkingBaseAndType;
+      } else {
+        // detached HEAD
+        const headSha: string = await this.revParse('HEAD');
+        return {
+          workingBase: headSha,
+          workingBaseType: 'commit'
+        } as IWorkingBaseAndType;
+      }
     }
   }
 
@@ -169,7 +167,23 @@ export class GitCommandManager implements IGitCommandManager {
     } else {
       args.push(ref);
     }
-    // https://github.com/git/git/commit/a047fafc7866cc4087201e284dc1f53e8f9a32d5
+    await this.execGit(args);
+  }
+
+  async switch(
+    ref: string,
+    options?: string[],
+    startPoint?: string
+  ): Promise<void> {
+    const args: string[] = ['switch'];
+    if (options) {
+      args.push(...options);
+    }
+    if (startPoint) {
+      args.push('-c', ref, startPoint);
+    } else {
+      args.push(ref);
+    }
     args.push('--');
     await this.execGit(args);
   }
@@ -222,26 +236,50 @@ export class GitCommandManager implements IGitCommandManager {
     await this.execGit(args);
   }
 
-  async isAhead(branch1: string, branch2: string): Promise<boolean> {
-    return (await this.commitsAhead(branch1, branch2)) > 0;
+  async fetchAll(): Promise<void> {
+    await this.execGit(['fetch']);
   }
 
-  async commitsAhead(branch1: string, branch2: string): Promise<number> {
+  async isAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<boolean> {
+    return (await this.commitsAhead(branch1, branch2, options)) > 0;
+  }
+
+  async commitsAhead(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<number> {
+    const args: string[] = ['--right-only', '--count'];
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      ['--right-only', '--count']
+      args,
+      options
     );
     return Number(result);
   }
 
-  async isBehind(branch1: string, branch2: string): Promise<boolean> {
-    return (await this.commitsBehind(branch1, branch2)) > 0;
+  async isBehind(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<boolean> {
+    return (await this.commitsBehind(branch1, branch2, options)) > 0;
   }
 
-  async commitsBehind(branch1: string, branch2: string): Promise<number> {
+  async commitsBehind(
+    branch1: string,
+    branch2: string,
+    options?: string[]
+  ): Promise<number> {
+    const args: string[] = ['--left-only', '--count'];
     const result: string = await this.revList(
       [`${branch1}...${branch2}`],
-      ['--left-only', '--count']
+      args,
+      options
     );
     return Number(result);
   }
@@ -349,21 +387,28 @@ export class GitCommandManager implements IGitCommandManager {
 
   private async revList(
     commitExpression: string[],
+    args?: string[],
     options?: string[]
   ): Promise<string> {
-    const args: string[] = ['rev-list'];
-    if (options) {
-      args.push(...options);
+    const argArr: string[] = ['rev-list'];
+    if (args) {
+      argArr.push(...args);
     }
-    args.push(...commitExpression);
-    const output: GitExecOutput = await this.execGit(args);
+    argArr.push(...commitExpression);
+    if (options) {
+      argArr.push(...options);
+    }
+    const output: GitExecOutput = await this.execGit(argArr);
     return output.getStdout().trim();
   }
 
   async init(workingDirectory: string): Promise<void> {
+    core.startGroup('Starting initialising Git Command Manager...');
     core.info(InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
     this._workingDirectory = workingDirectory;
     this._gitPath = await io.which('git', true);
+    core.info(`Git path: ${this._gitPath}`);
+    core.endGroup();
   }
 
   private async execGit(
@@ -395,6 +440,8 @@ export class GitCommandManager implements IGitCommandManager {
 
     const exitCode: number = await exec.exec(this._gitPath, args, execOptions);
     output.exitCode = exitCode;
+
+    core.debug(output.getDebug());
 
     return output;
   }

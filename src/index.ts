@@ -10,9 +10,13 @@ export const run: () => Promise<void> = async (): Promise<void> => {
   try {
     const inputs: IInputs = prepareInputValues();
     const service: IService = createService(inputs);
+    core.startGroup('Starting to create pull request');
     let pullRequest: Pull = await service.createPullRequest();
+    core.endGroup();
     if (inputs.AUTO_MERGE) {
+      core.startGroup('Starting to merge pull request');
       pullRequest = await service.mergePullRequestWithRetries(pullRequest);
+      core.endGroup();
     }
 
     core.startGroup('Setting outputs');

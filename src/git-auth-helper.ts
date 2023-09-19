@@ -44,6 +44,7 @@ export class GitAuthHelper implements IGitAuthHelper {
     gitCommandManager: IGitCommandManager,
     gitSourceSettings: IGitSourceSettings
   ) {
+    core.startGroup('Starting Git Auth Helper');
     this._git = gitCommandManager;
     this._settings = gitSourceSettings;
 
@@ -65,6 +66,7 @@ export class GitAuthHelper implements IGitAuthHelper {
         `org-${this.settings.workflowOrganizationId}@github.com:`
       );
     }
+    core.endGroup();
   }
 
   async configureAuth(): Promise<void> {
@@ -262,6 +264,7 @@ export class GitAuthHelper implements IGitAuthHelper {
       url && url.trim().length > 0
         ? url
         : process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+    core.debug(`Server URL: "${urlValue}"`);
     return new URL(urlValue);
   }
 

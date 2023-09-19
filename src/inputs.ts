@@ -98,11 +98,11 @@ class Inputs implements IInputs {
     signoff: boolean
   ) {
     this._GITHUB_TOKEN = githubToken;
-    this._REPO_OWNER = repoOwner;
-    this._REPO_NAME = repoName;
-    this._REMOTE_NAME = remoteName;
-    this._SOURCE_BRANCH_NAME = sourceBranchName;
-    this._TARGET_BRANCH_NAME = targetBranchName;
+    this._REPO_OWNER = this.stringEscape(repoOwner);
+    this._REPO_NAME = this.stringEscape(repoName);
+    this._REMOTE_NAME = this.stringEscape(remoteName);
+    this._SOURCE_BRANCH_NAME = this.stringEscape(sourceBranchName);
+    this._TARGET_BRANCH_NAME = this.stringEscape(targetBranchName);
     this._PR_TITLE = prTitle;
     this._PR_BODY = prBody;
     this._DRAFT = draft;
@@ -124,6 +124,10 @@ class Inputs implements IInputs {
         : teamReviewers;
     this._LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
     this._SIGNOFF = signoff;
+  }
+
+  private stringEscape(str: string): string {
+    return str.replace(/(\r\n|\n|\r)/gm, '');
   }
 
   get GITHUB_TOKEN(): string {

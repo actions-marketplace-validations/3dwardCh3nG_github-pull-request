@@ -13605,6 +13605,7 @@ class GitAuthHelper {
     _sshKeyPath = '';
     _sshKnownHostsPath = '';
     constructor(gitCommandManager, gitSourceSettings) {
+        core.startGroup('Starting Git Auth Helper');
         this._git = gitCommandManager;
         this._settings = gitSourceSettings;
         // Token auth header
@@ -13619,6 +13620,7 @@ class GitAuthHelper {
         if (this.settings.workflowOrganizationId) {
             this.insteadOfValues.push(`org-${this.settings.workflowOrganizationId}@github.com:`);
         }
+        core.endGroup();
     }
     async configureAuth() {
         // Remove possible previous values
@@ -13760,6 +13762,7 @@ class GitAuthHelper {
         const urlValue = url && url.trim().length > 0
             ? url
             : process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+        core.debug(`Server URL: "${urlValue}"`);
         return new url_1.URL(urlValue);
     }
     get IS_WINDOWS() {
@@ -13867,21 +13870,32 @@ class GitCommandManager {
         return this.githubHttpsUrlValidator(githubUrl, remoteUrl);
     }
     async getWorkingBaseAndType() {
-        const symbolicRefResult = await this.execGit(['symbolic-ref', 'HEAD', '--short'], true);
-        if (symbolicRefResult.exitCode === 0) {
-            // ref
+        let ref = process.env['GITHUB_REF'];
+        if (ref?.includes('/pull/')) {
+            const pullName = ref.substring('refs/pull/'.length);
+            ref = `refs/remotes/pull/${pullName}`;
             return {
-                workingBase: symbolicRefResult.getStdout(),
-                workingBaseType: 'branch'
+                workingBase: ref,
+                workingBaseType: 'pull'
             };
         }
         else {
-            // detached HEAD
-            const headSha = await this.revParse('HEAD');
-            return {
-                workingBase: headSha,
-                workingBaseType: 'commit'
-            };
+            const symbolicRefResult = await this.execGit(['symbolic-ref', 'HEAD', '--short'], true);
+            if (symbolicRefResult.exitCode === 0) {
+                // ref
+                return {
+                    workingBase: symbolicRefResult.getStdout(),
+                    workingBaseType: 'branch'
+                };
+            }
+            else {
+                // detached HEAD
+                const headSha = await this.revParse('HEAD');
+                return {
+                    workingBase: headSha,
+                    workingBaseType: 'commit'
+                };
+            }
         }
     }
     async stashPush(options) {
@@ -13916,7 +13930,19 @@ class GitCommandManager {
         else {
             args.push(ref);
         }
-        // https://github.com/git/git/commit/a047fafc7866cc4087201e284dc1f53e8f9a32d5
+        await this.execGit(args);
+    }
+    async switch(ref, options, startPoint) {
+        const args = ['switch'];
+        if (options) {
+            args.push(...options);
+        }
+        if (startPoint) {
+            args.push('-c', ref, startPoint);
+        }
+        else {
+            args.push(ref);
+        }
         args.push('--');
         await this.execGit(args);
     }
@@ -13952,18 +13978,23 @@ class GitCommandManager {
         }
         await this.execGit(args);
     }
-    async isAhead(branch1, branch2) {
-        return (await this.commitsAhead(branch1, branch2)) > 0;
+    async fetchAll() {
+        await this.execGit(['fetch']);
     }
-    async commitsAhead(branch1, branch2) {
-        const result = await this.revList([`${branch1}...${branch2}`], ['--right-only', '--count']);
+    async isAhead(branch1, branch2, options) {
+        return (await this.commitsAhead(branch1, branch2, options)) > 0;
+    }
+    async commitsAhead(branch1, branch2, options) {
+        const args = ['--right-only', '--count'];
+        const result = await this.revList([`${branch1}...${branch2}`], args, options);
         return Number(result);
     }
-    async isBehind(branch1, branch2) {
-        return (await this.commitsBehind(branch1, branch2)) > 0;
+    async isBehind(branch1, branch2, options) {
+        return (await this.commitsBehind(branch1, branch2, options)) > 0;
     }
-    async commitsBehind(branch1, branch2) {
-        const result = await this.revList([`${branch1}...${branch2}`], ['--left-only', '--count']);
+    async commitsBehind(branch1, branch2, options) {
+        const args = ['--left-only', '--count'];
+        const result = await this.revList([`${branch1}...${branch2}`], args, options);
         return Number(result);
     }
     async isEven(branch1, branch2) {
@@ -14038,19 +14069,25 @@ class GitCommandManager {
     async getGitDirectory() {
         return this.revParse('--git-dir');
     }
-    async revList(commitExpression, options) {
-        const args = ['rev-list'];
-        if (options) {
-            args.push(...options);
+    async revList(commitExpression, args, options) {
+        const argArr = ['rev-list'];
+        if (args) {
+            argArr.push(...args);
         }
-        args.push(...commitExpression);
-        const output = await this.execGit(args);
+        argArr.push(...commitExpression);
+        if (options) {
+            argArr.push(...options);
+        }
+        const output = await this.execGit(argArr);
         return output.getStdout().trim();
     }
     async init(workingDirectory) {
+        core.startGroup('Starting initialising Git Command Manager...');
         core.info(message_1.InfoMessages.INITIALISING_GIT_COMMAND_MANAGER);
         this._workingDirectory = workingDirectory;
         this._gitPath = await io.which('git', true);
+        core.info(`Git path: ${this._gitPath}`);
+        core.endGroup();
     }
     async execGit(args, ignoreReturnCode = false, silent = false) {
         const output = new git_exec_output_1.GitExecOutput();
@@ -14074,6 +14111,7 @@ class GitCommandManager {
         };
         const exitCode = await exec.exec(this._gitPath, args, execOptions);
         output.exitCode = exitCode;
+        core.debug(output.getDebug());
         return output;
     }
     getEnvs() {
@@ -14508,9 +14546,13 @@ const run = async () => {
     try {
         const inputs = (0, inputs_1.prepareInputValues)();
         const service = (0, service_1.createService)(inputs);
+        core.startGroup('Starting to create pull request');
         let pullRequest = await service.createPullRequest();
+        core.endGroup();
         if (inputs.AUTO_MERGE) {
+            core.startGroup('Starting to merge pull request');
             pullRequest = await service.mergePullRequestWithRetries(pullRequest);
+            core.endGroup();
         }
         core.startGroup('Setting outputs');
         core.setOutput('pull-request-number', pullRequest.number);
@@ -14595,11 +14637,11 @@ class Inputs {
     _SIGNOFF;
     constructor(githubToken, repoOwner, repoName, remoteName, sourceBranchName, targetBranchName, prTitle, prBody, draft, requireMiddleBranch, autoMerge, mergeMethod, maxMergeRetries, mergeRetryInterval, milestone, assignees, reviewers, teamReviewers, labels, signoff) {
         this._GITHUB_TOKEN = githubToken;
-        this._REPO_OWNER = repoOwner;
-        this._REPO_NAME = repoName;
-        this._REMOTE_NAME = remoteName;
-        this._SOURCE_BRANCH_NAME = sourceBranchName;
-        this._TARGET_BRANCH_NAME = targetBranchName;
+        this._REPO_OWNER = this.stringEscape(repoOwner);
+        this._REPO_NAME = this.stringEscape(repoName);
+        this._REMOTE_NAME = this.stringEscape(remoteName);
+        this._SOURCE_BRANCH_NAME = this.stringEscape(sourceBranchName);
+        this._TARGET_BRANCH_NAME = this.stringEscape(targetBranchName);
         this._PR_TITLE = prTitle;
         this._PR_BODY = prBody;
         this._DRAFT = draft;
@@ -14621,6 +14663,9 @@ class Inputs {
                 : teamReviewers;
         this._LABELS = labels.length === 1 && labels[0] === '' ? undefined : labels;
         this._SIGNOFF = signoff;
+    }
+    stringEscape(str) {
+        return str.replace(/(\r\n|\n|\r)/gm, '');
     }
     get GITHUB_TOKEN() {
         return this._GITHUB_TOKEN;
@@ -14921,15 +14966,14 @@ class Service {
             core.startGroup('Create or update the pull request branch');
             const result = await this.preparePullRequestBranch(git);
             core.endGroup();
+            core.startGroup('Pushing the pull request branch');
             await this.pushPullRequestBranch(git, result);
+            core.endGroup();
             if (result.hasDiffWithTargetBranch) {
                 core.startGroup('Create or update the pull request');
                 pullRequest = await this.githubClient.preparePullRequest(this.inputs, result);
                 core.endGroup();
             }
-        }
-        catch (error) {
-            core.setFailed(this.workflowUtils.getErrorMessage(error));
         }
         finally {
             await gitAuthHelper.removeAuth();
@@ -14979,10 +15023,11 @@ class Service {
             headSha: ''
         };
         const workingBaseAndType = await git.getWorkingBaseAndType();
+        core.info(`Working base is ${workingBaseAndType.workingBaseType} '${workingBaseAndType.workingBase}'`);
         const stashed = await git.stashPush(['--include-untracked']);
-        if (workingBaseAndType.workingBase !== this.inputs.TARGET_BRANCH_NAME) {
-            await git.fetchRemote([`${this.inputs.TARGET_BRANCH_NAME}:${this.inputs.TARGET_BRANCH_NAME}`], this.inputs.REMOTE_NAME, ['--force']);
-            await git.checkout(this.inputs.TARGET_BRANCH_NAME);
+        if (workingBaseAndType.workingBase !== this.inputs.SOURCE_BRANCH_NAME) {
+            await git.fetchAll();
+            await git.checkout(this.inputs.SOURCE_BRANCH_NAME);
             await git.pull();
         }
         const tempBranch = (0, uuid_1.v4)();
@@ -14990,12 +15035,12 @@ class Service {
         let pullRequestBranchName = this.inputs.SOURCE_BRANCH_NAME;
         if (this.inputs.REQUIRE_MIDDLE_BRANCH) {
             pullRequestBranchName = `${this.inputs.SOURCE_BRANCH_NAME}-merge-to-${this.inputs.TARGET_BRANCH_NAME}`;
-            result.targetBranch = pullRequestBranchName;
+            result.sourceBranch = pullRequestBranchName;
         }
         if (!(await git.fetch(this.inputs.REMOTE_NAME, pullRequestBranchName))) {
             core.info(`Pull request branch '${pullRequestBranchName}' does not exist yet.`);
             await git.checkout(pullRequestBranchName, tempBranch);
-            result.hasDiffWithTargetBranch = await git.isAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName);
+            result.hasDiffWithTargetBranch = await git.isAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, pullRequestBranchName, ['--']);
             if (result.hasDiffWithTargetBranch) {
                 result.action = 'created';
                 core.info(`Created branch '${pullRequestBranchName}'`);
@@ -15007,11 +15052,11 @@ class Service {
         else {
             core.info(`Pull request branch '${pullRequestBranchName}' already exists as remote branch '${this.inputs.REMOTE_NAME}/${pullRequestBranchName}'`);
             await git.checkout(pullRequestBranchName);
-            const tempBranchCommitsAhead = await git.commitsAhead(this.inputs.TARGET_BRANCH_NAME, tempBranch);
-            const branchCommitsAhead = await git.commitsAhead(this.inputs.TARGET_BRANCH_NAME, pullRequestBranchName);
+            const tempBranchCommitsAhead = await git.commitsAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, tempBranch);
+            const branchCommitsAhead = await git.commitsAhead(`${this.inputs.REMOTE_NAME}/${this.inputs.TARGET_BRANCH_NAME}`, pullRequestBranchName);
             if ((await git.hasDiff([`${pullRequestBranchName}..${tempBranch}`])) ||
                 branchCommitsAhead !== tempBranchCommitsAhead ||
-                !(tempBranchCommitsAhead > 0)) {
+                tempBranchCommitsAhead <= 0) {
                 core.info(`Resetting '${pullRequestBranchName}'`);
                 await git.checkout(pullRequestBranchName, tempBranch);
             }
@@ -15047,7 +15092,7 @@ class Service {
     async prepareGitAuthentication() {
         const repoPath = this.workflowUtils.getRepoPath();
         const git = await git_command_manager_1.GitCommandManager.create(repoPath);
-        const gitSourceSettings = new git_source_settings_1.GitSourceSettings(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.SOURCE_BRANCH_NAME, this.inputs.TARGET_BRANCH_NAME, undefined, undefined, undefined, undefined, undefined);
+        const gitSourceSettings = new git_source_settings_1.GitSourceSettings(repoPath, this.inputs.REPO_OWNER, this.inputs.REPO_NAME, this.inputs.GITHUB_TOKEN, undefined, undefined, undefined, undefined, undefined, undefined);
         const gitAuthHelper = new git_auth_helper_1.GitAuthHelper(git, gitSourceSettings);
         const remoteUrl = await git.getRepoRemoteUrl();
         const remoteDetail = git.getRemoteDetail(remoteUrl);

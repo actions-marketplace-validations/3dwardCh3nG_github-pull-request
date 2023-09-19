@@ -95,7 +95,7 @@ describe('Test git-command-manager.ts', (): void => {
         );
 
       expect(gitCommandManager).toBeDefined();
-      expect(infoSpy).toHaveBeenCalledTimes(1);
+      expect(infoSpy).toHaveBeenCalledTimes(2);
       expect(gitCommandManager.workingDirectory).toBe(workingDirectory);
       expect(gitCommandManager.gitPath).toBe('/usr/bin/git');
     });
@@ -219,6 +219,25 @@ describe('Test git-command-manager.ts', (): void => {
       GitCommandManagerRealModule = jest.requireActual(
         '../src/git-command-manager'
       );
+    });
+
+    afterEach((): void => {
+      delete process.env['GITHUB_REF'];
+    });
+
+    it('should success and return working base and type when currently on Pull', async (): Promise<void> => {
+      process.env['GITHUB_REF'] = 'refs/pull/1/merge';
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      const workingBaseAndType: IWorkingBaseAndType =
+        await gitCommandManager.getWorkingBaseAndType();
+
+      expect(workingBaseAndType.workingBase).toBe('refs/remotes/pull/1/merge');
+      expect(workingBaseAndType.workingBaseType).toBe('pull');
     });
 
     it('should success and return working base and type when currently on a branch HEAD', async (): Promise<void> => {
@@ -506,13 +525,12 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 6 &&
+            args.length === 5 &&
             args[0] === 'checkout' &&
             args[1] === '--progress' &&
             args[2] === '-B' &&
             args[3] === ref &&
             args[4] === startPoint &&
-            args[5] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -545,14 +563,13 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 7 &&
+            args.length === 6 &&
             args[0] === 'checkout' &&
             args[1] === '--progress' &&
             args[2] === '--force' &&
             args[3] === '-B' &&
             args[4] === ref &&
             args[5] === startPoint &&
-            args[6] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -571,6 +588,109 @@ describe('Test git-command-manager.ts', (): void => {
         );
 
       await gitCommandManager.checkout(ref, startPoint);
+
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should success and return true when checkout to a branch with no startPoint given', async (): Promise<void> => {
+      const ref: string = 'this-is-the-develop-branch';
+      const execMock: jest.SpyInstance = execSpy.mockImplementation(
+        async (
+          gitPath: string,
+          args: string[],
+          options: exec.ExecOptions
+        ): Promise<number> => {
+          if (
+            args.length === 4 &&
+            args[0] === 'checkout' &&
+            args[1] === '--progress' &&
+            args[2] === '--force' &&
+            args[3] === ref &&
+            gitPath === '/usr/bin/git'
+          ) {
+            options.listeners?.stdout?.call(
+              options.listeners.stdout,
+              Buffer.from('this-is-the-develop-branch')
+            );
+            return new Promise(resolve => resolve(0));
+          }
+          return new Promise(resolve => resolve(1));
+        }
+      );
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      await gitCommandManager.checkout(ref);
+
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Test switch function', (): void => {
+    const execSpy: jest.SpyInstance = jest.spyOn(exec, 'exec');
+    let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
+
+    beforeAll((): void => {
+      GitCommandManagerRealModule = jest.requireActual(
+        '../src/git-command-manager'
+      );
+    });
+
+    it('should success and return true when switch to a branch', async (): Promise<void> => {
+      const ref: string = 'this-is-the-develop-branch';
+      const execMock: jest.SpyInstance = execSpy.mockImplementation(
+        async (gitPath: string, args: string[]): Promise<number> => {
+          if (
+            args.length === 2 &&
+            args[0] === 'switch' &&
+            args[1] === ref &&
+            gitPath === '/usr/bin/git'
+          ) {
+            return new Promise(resolve => resolve(0));
+          }
+          return new Promise(resolve => resolve(1));
+        }
+      );
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      await gitCommandManager.switch(ref);
+
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should success and return true when checkout to a branch with options and startpoint', async (): Promise<void> => {
+      const ref: string = 'this-is-the-develop-branch';
+      const startPoint: string = 'HEAD';
+      const execMock: jest.SpyInstance = execSpy.mockImplementation(
+        async (gitPath: string, args: string[]): Promise<number> => {
+          if (
+            args.length === 5 &&
+            args[0] === 'switch' &&
+            args[1] === '-q' &&
+            args[2] === '-c' &&
+            args[3] === ref &&
+            args[4] === startPoint &&
+            gitPath === '/usr/bin/git'
+          ) {
+            return new Promise(resolve => resolve(0));
+          }
+          return new Promise(resolve => resolve(1));
+        }
+      );
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      await gitCommandManager.switch(ref, ['-q'], startPoint);
 
       expect(execMock).toHaveBeenCalledTimes(1);
     });
@@ -758,6 +878,42 @@ describe('Test git-command-manager.ts', (): void => {
     });
   });
 
+  describe('Test fetchAll function', (): void => {
+    const execSpy: jest.SpyInstance = jest.spyOn(exec, 'exec');
+    let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
+
+    beforeAll((): void => {
+      GitCommandManagerRealModule = jest.requireActual(
+        '../src/git-command-manager'
+      );
+    });
+
+    it('should success and use default remote value origin when remote is not given', async (): Promise<void> => {
+      fileExistsSyncMock.mockReturnValue(true);
+      const execMock: jest.SpyInstance = execSpy.mockImplementation(
+        async (gitPath: string, args: string[]): Promise<number> => {
+          if (
+            args.length === 1 &&
+            args[0] === 'fetch' &&
+            gitPath === '/usr/bin/git'
+          ) {
+            return new Promise(resolve => resolve(0));
+          }
+          return new Promise(resolve => resolve(1));
+        }
+      );
+
+      const gitCommandManager: GitCommandManager =
+        await GitCommandManagerRealModule.GitCommandManager.create(
+          workingDirectory
+        );
+
+      await gitCommandManager.fetchAll();
+
+      expect(execMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Test isAhead function', (): void => {
     const execSpy: jest.SpyInstance = jest.spyOn(exec, 'exec');
     let GitCommandManagerRealModule: typeof import('../src/git-command-manager');
@@ -776,11 +932,12 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 4 &&
+            args.length === 5 &&
             args[0] === 'rev-list' &&
             args[1] === '--right-only' &&
             args[2] === '--count' &&
             args[3] === 'branch1...branch2' &&
+            args[4] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -801,7 +958,11 @@ describe('Test git-command-manager.ts', (): void => {
       const branch1: string = 'branch1';
       const branch2: string = 'branch2';
 
-      const result: boolean = await gitCommandManager.isAhead(branch1, branch2);
+      const result: boolean = await gitCommandManager.isAhead(
+        branch1,
+        branch2,
+        ['--']
+      );
 
       expect(result).toBe(true);
       expect(execMock).toHaveBeenCalledTimes(1);
@@ -865,11 +1026,12 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 4 &&
+            args.length === 5 &&
             args[0] === 'rev-list' &&
             args[1] === '--left-only' &&
             args[2] === '--count' &&
             args[3] === 'branch1...branch2' &&
+            args[4] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -892,7 +1054,8 @@ describe('Test git-command-manager.ts', (): void => {
 
       const result: boolean = await gitCommandManager.isBehind(
         branch1,
-        branch2
+        branch2,
+        ['--']
       );
 
       expect(result).toBe(true);
