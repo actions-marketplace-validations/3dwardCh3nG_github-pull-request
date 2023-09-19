@@ -236,7 +236,7 @@ describe('Test git-command-manager.ts', (): void => {
       const workingBaseAndType: IWorkingBaseAndType =
         await gitCommandManager.getWorkingBaseAndType();
 
-      expect(workingBaseAndType.workingBase).toBe('refs/pull/1/merge');
+      expect(workingBaseAndType.workingBase).toBe('refs/remotes/pull/1/merge');
       expect(workingBaseAndType.workingBaseType).toBe('pull');
     });
 

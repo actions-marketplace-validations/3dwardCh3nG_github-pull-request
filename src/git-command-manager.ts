@@ -103,8 +103,10 @@ export class GitCommandManager implements IGitCommandManager {
   }
 
   async getWorkingBaseAndType(): Promise<IWorkingBaseAndType> {
-    const ref: string | undefined = process.env['GITHUB_REF'];
+    let ref: string | undefined = process.env['GITHUB_REF'];
     if (ref?.includes('/pull/')) {
+      const pullName: string = ref.substring('refs/pull/'.length);
+      ref = `refs/remotes/pull/${pullName}`;
       return {
         workingBase: ref,
         workingBaseType: 'pull'

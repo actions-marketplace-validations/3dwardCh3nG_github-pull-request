@@ -13870,8 +13870,10 @@ class GitCommandManager {
         return this.githubHttpsUrlValidator(githubUrl, remoteUrl);
     }
     async getWorkingBaseAndType() {
-        const ref = process.env['GITHUB_REF'];
+        let ref = process.env['GITHUB_REF'];
         if (ref?.includes('/pull/')) {
+            const pullName = ref.substring('refs/pull/'.length);
+            ref = `refs/remotes/pull/${pullName}`;
             return {
                 workingBase: ref,
                 workingBaseType: 'pull'
