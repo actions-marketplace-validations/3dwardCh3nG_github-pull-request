@@ -525,13 +525,12 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 6 &&
+            args.length === 5 &&
             args[0] === 'checkout' &&
             args[1] === '--progress' &&
             args[2] === '-B' &&
             args[3] === ref &&
             args[4] === startPoint &&
-            args[5] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -564,14 +563,13 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 7 &&
+            args.length === 6 &&
             args[0] === 'checkout' &&
             args[1] === '--progress' &&
             args[2] === '--force' &&
             args[3] === '-B' &&
             args[4] === ref &&
             args[5] === startPoint &&
-            args[6] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
@@ -603,12 +601,11 @@ describe('Test git-command-manager.ts', (): void => {
           options: exec.ExecOptions
         ): Promise<number> => {
           if (
-            args.length === 5 &&
+            args.length === 4 &&
             args[0] === 'checkout' &&
             args[1] === '--progress' &&
             args[2] === '--force' &&
             args[3] === ref &&
-            args[4] === '--' &&
             gitPath === '/usr/bin/git'
           ) {
             options.listeners?.stdout?.call(
