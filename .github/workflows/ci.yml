@@ -111,6 +111,7 @@ jobs:
           GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
           $BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
         run: |
+          echo "Setting git config"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global core.autocrlf input
