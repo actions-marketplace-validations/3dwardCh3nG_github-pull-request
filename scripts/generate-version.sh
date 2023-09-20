@@ -20,8 +20,9 @@ then
     exit 1;
   fi
 fi
-git config --global user.name "github-actions[bot]"
-git config --global user.email "github-actions[bot]@users.noreply.github.com"
+echo "Setting git config"
+git config --global user.name "github-actions"
+git config --global user.email "github-actions@users.noreply.github.com"
 if [[ "$BRANCH_NAME" == "main" ]]
 then
   echo "Create extra release tags"
