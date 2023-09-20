@@ -108,16 +108,19 @@ jobs:
         run: bash ./scripts/generate-version.sh ${{ steps.branch-name.outputs.current_branch }}
       - name: Create Tags
         env:
+          GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
           BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
         run: |
-          echo "Login with token via GH CLI"
-          echo ${{ secrets.PIPELINE_GITHUB_TOKEN }} > myToken.txt
-          gh auth login --with-token < myToken.txt
+#          echo "Login with token via GH CLI"
+#          echo ${{ secrets.PIPELINE_GITHUB_TOKEN }} > myToken.txt
+#          gh auth login --with-token < myToken.txt
           echo "Setting git config"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global core.autocrlf input
           git config --global push.followTags true
+          git ls-remote --get-url origin
+          git remote set-url origin https://3dwardch3ng:"$GH_TOKEN"@github.com/3dwardch3ng/github-pull-request.git
           if [[ "$BRANCH_NAME" == "develop" ]]
           then
             echo "Create extra develop tag"
