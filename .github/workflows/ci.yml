@@ -43,35 +43,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PIPELINE_GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  test-action:
-    name: GitHub Actions Test
-    runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'pull_request' &&
-      github.base_ref == 'develop' &&
-      github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.action == 'reopened'
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Get branch name
-        id: branch-name
-        uses: tj-actions/branch-names@v7.0.5
-      - name: Test Local Action
-        id: test-action-merge-develop-to-current-branch
-        uses: ./
-        with:
-          github_token: ${{ secrets.PIPELINE_GITHUB_TOKEN }}
-          repo_owner: 3dwardch3ng
-          repo_name: 'github-pull-request'
-          source_branch: 'develop'
-          target_branch: ${{ steps.branch-name.outputs.current_branch }}
-          pr_title: 'merge from develop'
-          require_middle_branch: true
-          auto_merge: true
-          max_merge_retries: 10
   release:
     name: generate-version
     runs-on: ubuntu-latest
