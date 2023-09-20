@@ -111,9 +111,6 @@ jobs:
           GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
           BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
         run: |
-#          echo "Login with token via GH CLI"
-#          echo ${{ secrets.PIPELINE_GITHUB_TOKEN }} > myToken.txt
-#          gh auth login --with-token < myToken.txt
           echo "Setting git config"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
