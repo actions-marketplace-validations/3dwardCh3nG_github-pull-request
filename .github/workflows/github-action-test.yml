@@ -1,6 +1,7 @@
 name: GitHub Actions Test
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [ opened, synchronize, reopened ]
     branches:
