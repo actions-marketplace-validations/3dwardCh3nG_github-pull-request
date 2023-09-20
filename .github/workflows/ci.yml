@@ -84,14 +84,15 @@ jobs:
     if: |
       github.event_name == 'push'
     steps:
-      - name: Get branch name
-        id: branch-name
-        uses: tj-actions/branch-names@v7.0.5
       - name: checkout
         uses: actions/checkout@v3.6.0
         with:
           fetch-depth: 0
           persist-credentials: false
+          token: ${{ secrets.PIPELINE_GITHUB_TOKEN }}
+      - name: Get branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v7.0.5
       - uses: actions/setup-node@v3
         with:
           node-version: "lts/*"
