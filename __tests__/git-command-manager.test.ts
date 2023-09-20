@@ -530,7 +530,7 @@ describe('Test git-command-manager.ts', (): void => {
             args[1] === '--progress' &&
             args[2] === '--force' &&
             args[3] === '-B' &&
-            args[4] === `refs/heads/${ref}` &&
+            args[4] === ref &&
             args[5] === startPoint &&
             args[6] === '--' &&
             gitPath === '/usr/bin/git'
@@ -570,7 +570,7 @@ describe('Test git-command-manager.ts', (): void => {
             args[1] === '--progress' &&
             args[2] === '--force' &&
             args[3] === '-B' &&
-            args[4] === `refs/heads/${ref}` &&
+            args[4] === ref &&
             args[5] === startPoint &&
             args[6] === '--' &&
             gitPath === '/usr/bin/git'
@@ -608,7 +608,7 @@ describe('Test git-command-manager.ts', (): void => {
             args[0] === 'checkout' &&
             args[1] === '--progress' &&
             args[2] === '--force' &&
-            args[3] === `refs/heads/${ref}` &&
+            args[3] === ref &&
             args[4] === '--' &&
             gitPath === '/usr/bin/git'
           ) {

@@ -13924,9 +13924,6 @@ class GitCommandManager {
     }
     async checkout(ref, startPoint) {
         const args = ['checkout', '--progress', '--force'];
-        if (!ref.includes('refs/heads/')) {
-            ref = `refs/heads/${ref}`;
-        }
         if (startPoint) {
             args.push('-B', ref, startPoint);
         }

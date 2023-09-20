@@ -162,9 +162,6 @@ export class GitCommandManager implements IGitCommandManager {
 
   async checkout(ref: string, startPoint?: string): Promise<void> {
     const args: string[] = ['checkout', '--progress', '--force'];
-    if (!ref.includes('refs/heads/')) {
-      ref = `refs/heads/${ref}`;
-    }
     if (startPoint) {
       args.push('-B', ref, startPoint);
     } else {
