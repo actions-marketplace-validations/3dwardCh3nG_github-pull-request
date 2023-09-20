@@ -54,26 +54,26 @@ export const prepareInputValues: () => IInputs = (): IInputs => {
 };
 
 class Inputs implements IInputs {
-  private _GITHUB_TOKEN: string;
-  private _REPO_OWNER: string;
-  private _REPO_NAME: string;
-  private _REMOTE_NAME: string;
-  private _SOURCE_BRANCH_NAME: string;
-  private _TARGET_BRANCH_NAME: string;
-  private _PR_TITLE: string;
+  private readonly _GITHUB_TOKEN: string;
+  private readonly _REPO_OWNER: string;
+  private readonly _REPO_NAME: string;
+  private readonly _REMOTE_NAME: string;
+  private readonly _SOURCE_BRANCH_NAME: string;
+  private readonly _TARGET_BRANCH_NAME: string;
+  private readonly _PR_TITLE: string;
   private _PR_BODY: string;
-  private _DRAFT: boolean;
-  private _REQUIRE_MIDDLE_BRANCH: boolean;
-  private _AUTO_MERGE: boolean;
-  private _MERGE_METHOD: 'merge' | 'squash' | 'rebase';
-  private _MAX_MERGE_RETRIES: number;
-  private _MERGE_RETRY_INTERVAL: number;
-  private _MILESTONE: number | undefined;
-  private _ASSIGNEES: string[] | undefined;
-  private _REVIEWERS: string[] | undefined;
-  private _TEAM_REVIEWERS: string[] | undefined;
-  private _LABELS: string[] | undefined;
-  private _SIGNOFF: boolean;
+  private readonly _DRAFT: boolean;
+  private readonly _REQUIRE_MIDDLE_BRANCH: boolean;
+  private readonly _AUTO_MERGE: boolean;
+  private readonly _MERGE_METHOD: 'merge' | 'squash' | 'rebase';
+  private readonly _MAX_MERGE_RETRIES: number;
+  private readonly _MERGE_RETRY_INTERVAL: number;
+  private readonly _MILESTONE: number | undefined;
+  private readonly _ASSIGNEES: string[] | undefined;
+  private readonly _REVIEWERS: string[] | undefined;
+  private readonly _TEAM_REVIEWERS: string[] | undefined;
+  private readonly _LABELS: string[] | undefined;
+  private readonly _SIGNOFF: boolean;
 
   constructor(
     githubToken: string,

@@ -9,17 +9,14 @@ Github Actions for the create (and merge) Github Pull Request
 #### Release
 ![GitHub release (with filter)](https://img.shields.io/github/v/release/3dwardch3ng/github-pull-request)
 ![CI](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/ci.yml/badge.svg?branch=main)
-[![Qodana](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/qodana_code_quality.yml/badge.svg?branch=main)](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/qodana_code_quality.yml)
 [![GitHub Super-Linter](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/linter.yml/badge.svg?branch=main)](https://github.com/super-linter/super-linter)
 #### Next
 ![GitHub release (with filter)](https://img.shields.io/github/v/release/3dwardch3ng/github-pull-request?filter=*-next*)
 ![CI](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/ci.yml/badge.svg?branch=next)
-[![Qodana](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/qodana_code_quality.yml/badge.svg?branch=next)](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/qodana_code_quality.yml)
 [![GitHub Super-Linter](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/linter.yml/badge.svg?branch=next)](https://github.com/super-linter/super-linter)
 #### Develop
 ![GitHub release (with filter)](https://img.shields.io/github/v/release/3dwardch3ng/github-pull-request?filter=*-develop*)
 ![CI](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/ci.yml/badge.svg?branch=develop)
-[![Qodana](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/qodana_code_quality.yml/badge.svg?branch=develop)](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/qodana_code_quality.yml)
 [![GitHub Super-Linter](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/linter.yml/badge.svg?branch=develop)](https://github.com/super-linter/super-linter)
 [![Dependency Review](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/3dwardCh3nG/github-pull-request/actions/workflows/dependency-review.yml)
 ![Unit Test](badges/coverage.svg)
@@ -48,7 +45,7 @@ jobs:
   runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@master
-    - uses: 3dwardCh3nG/github-pull-request@v1.0.0
+    - uses: 3dwardCh3nG/github-pull-request@v1
       with:
         github_token: ${{ secrets.GH_TOKEN }}
         repo_owner: '3dwardch3ng'
