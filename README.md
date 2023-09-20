@@ -45,7 +45,7 @@ jobs:
   runs-on: ubuntu-latest
   steps:
     - uses: actions/checkout@master
-    - uses: 3dwardCh3nG/github-pull-request@v1.0.0
+    - uses: 3dwardCh3nG/github-pull-request@v1
       with:
         github_token: ${{ secrets.GH_TOKEN }}
         repo_owner: '3dwardch3ng'
