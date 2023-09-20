@@ -91,7 +91,7 @@ jobs:
           if [[ "$BRANCH_NAME" == "develop" ]]
           then
             echo "Create extra develop tag"
-            git tag -a -f "develop" -m "latest develop"
+            git tag -a -f "dev" -m "latest develop"
             git push --force --tags
           fi
           if [[ "$BRANCH_NAME" == "next" ]]
