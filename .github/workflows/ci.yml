@@ -109,7 +109,7 @@ jobs:
       - name: Create Tags
         env:
           GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
-          $BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
+          BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
         run: |
           echo "Setting git config"
           git config --global user.name "github-actions[bot]"
