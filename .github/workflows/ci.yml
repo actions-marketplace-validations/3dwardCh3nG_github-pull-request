@@ -106,3 +106,31 @@ jobs:
           GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
         shell: bash
         run: bash ./scripts/generate-version.sh ${{ steps.branch-name.outputs.current_branch }}
+      - name: Create Tags
+        env:
+          GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
+          $BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global core.autocrlf input
+          git config --global push.followTags true
+          if [[ "$BRANCH_NAME" == "develop" ]]
+          then
+            echo "Create extra develop tag"
+            git tag -a -f "develop" -m "latest develop"
+            git push --force --tags
+          fi
+          if [[ "$BRANCH_NAME" == "next" ]]
+          then
+            echo "Create extra next tag"
+            git tag -a -f "next" -m "latest next"
+            git push --force --tags
+          fi
+          if [[ "$BRANCH_NAME" == "main" ]]
+          then
+            echo "Create extra release tags"
+            git tag -a -f "latest" -m "latest"
+            git tag -a -f "v1" -m "v1"
+            git push --force --tags
+          fi
