@@ -108,7 +108,6 @@ jobs:
         run: bash ./scripts/generate-version.sh ${{ steps.branch-name.outputs.current_branch }}
       - name: Create Tags
         env:
-          GH_TOKEN: ${{secrets.PIPELINE_GITHUB_TOKEN}}
           BRANCH_NAME: ${{ steps.branch-name.outputs.current_branch }}
         run: |
           echo "Login with token via GH CLI"
